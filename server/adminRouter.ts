@@ -1,7 +1,7 @@
 import { and, count, desc, eq, gte, inArray, like, or, sum } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { campaigns, collections, contacts, ownerQuotaOverrides, users } from "../drizzle/schema";
+import { campaigns, collections, contacts, ownerQuotaOverrides, subscriptionPayments, subscriptionPlans, users } from "../drizzle/schema";
 import { adminProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { createNenaClient } from "./cardoraNena";
@@ -161,6 +161,47 @@ export const adminRouter = router({
     const rows = await db.select({ id: campaigns.id, ownerId: campaigns.ownerId, collectionId: campaigns.collectionId, channel: campaigns.channel, subject: campaigns.subject, eligibleRecipientCount: campaigns.eligibleRecipientCount, queuedRecipientCount: campaigns.queuedRecipientCount, skippedRecipientCount: campaigns.skippedRecipientCount, status: campaigns.status, failureReason: campaigns.failureReason, createdAt: campaigns.createdAt, sentAt: campaigns.sentAt })
       .from(campaigns).where(filter).orderBy(desc(campaigns.createdAt)).limit(input.pageSize).offset(input.page * input.pageSize);
     const [total] = await db.select({ total: count() }).from(campaigns).where(filter);
+    return { rows, total: asNumber(total?.total), page: input.page, pageSize: input.pageSize };
+  }),
+
+  transactions: adminProcedure.input(searchPageInput.extend({ status: z.enum(["initializing", "pending", "paid", "failed"]).optional() })).query(async ({ input }) => {
+    const db = await requireDb();
+    const term = input.search.trim();
+    const clauses = [];
+    if (input.status) clauses.push(eq(subscriptionPayments.status, input.status));
+    if (term) clauses.push(or(
+      like(subscriptionPayments.reference, `%${term}%`),
+      like(users.name, `%${term}%`),
+      like(users.email, `%${term}%`),
+      like(subscriptionPlans.name, `%${term}%`),
+      ...( /^\d+$/.test(term) ? [eq(subscriptionPayments.ownerId, Number(term)), eq(subscriptionPayments.id, Number(term))] : []),
+    )!);
+    const filter = clauses.length ? and(...clauses) : undefined;
+    const rows = await db.select({
+      id: subscriptionPayments.id,
+      ownerId: subscriptionPayments.ownerId,
+      ownerName: users.name,
+      ownerEmail: users.email,
+      planName: subscriptionPlans.name,
+      reference: subscriptionPayments.reference,
+      amountMinor: subscriptionPayments.amountMinor,
+      currency: subscriptionPayments.currency,
+      billingInterval: subscriptionPayments.billingInterval,
+      status: subscriptionPayments.status,
+      providerChannel: subscriptionPayments.providerChannel,
+      paidAt: subscriptionPayments.paidAt,
+      periodEndAt: subscriptionPayments.periodEndAt,
+      createdAt: subscriptionPayments.createdAt,
+    }).from(subscriptionPayments)
+      .innerJoin(users, eq(subscriptionPayments.ownerId, users.id))
+      .leftJoin(subscriptionPlans, eq(subscriptionPayments.planId, subscriptionPlans.id))
+      .where(filter)
+      .orderBy(desc(subscriptionPayments.createdAt))
+      .limit(input.pageSize).offset(input.page * input.pageSize);
+    const [total] = await db.select({ total: count() }).from(subscriptionPayments)
+      .innerJoin(users, eq(subscriptionPayments.ownerId, users.id))
+      .leftJoin(subscriptionPlans, eq(subscriptionPayments.planId, subscriptionPlans.id))
+      .where(filter);
     return { rows, total: asNumber(total?.total), page: input.page, pageSize: input.pageSize };
   }),
 

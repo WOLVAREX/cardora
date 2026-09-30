@@ -776,6 +776,60 @@
 .dark .subscription-payment-pending { background:#202e24; border-color:#405044; color:#d0dccb; }
 .dark .subscription-payment-pending small,.dark .subscription-stk-form>small { color:#aab8a6; }
 .dark .subscription-stk-form>label { color:#d0dccb; }
+
+.transactions-page { display:grid; gap:14px; min-width:0; }
+.transaction-card { min-width:0; padding:18px; }
+.transaction-card-heading { display:flex; align-items:center; gap:10px; margin-bottom:13px; }
+.transaction-card-heading h2 { margin:0; color:#405346; font:500 20px Georgia,"Times New Roman",serif; }
+.transaction-card-heading p { margin:3px 0 0; color:#858d81; font-size:9px; }
+.transaction-table-wrap { width:100%; overflow-x:auto; overscroll-behavior-inline:contain; -webkit-overflow-scrolling:touch; }
+.transaction-table { width:100%; min-width:840px; border-collapse:collapse; text-align:left; }
+.transaction-table th { padding:10px 9px; border-top:1px solid #edede6; border-bottom:1px solid #edede6; color:#92998e; font-size:8px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; }
+.transaction-table td { padding:11px 9px; border-bottom:1px solid #f0efe9; color:#788176; font-size:9px; vertical-align:middle; white-space:nowrap; }
+.transaction-table td strong { color:#4c5b4d; font-size:9px; }
+.transaction-table code,.transaction-admin-table code { color:#6b7969; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:8px; }
+.transaction-method { display:inline-flex; align-items:center; gap:5px; color:#687867; text-transform:capitalize; }
+.transaction-method svg { color:#81956f; }
+.transaction-status { display:inline-flex; align-items:center; gap:5px; padding:4px 8px; border:1px solid transparent; border-radius:99px; background:#edf0ea; color:#727b70; font-size:8px; font-weight:700; text-transform:capitalize; white-space:nowrap; }
+.transaction-status i { width:6px; height:6px; border-radius:50%; background:currentColor; }
+.transaction-status.paid { background:#e8f2e5; color:#53784d; }
+.transaction-status.pending,.transaction-status.initializing { background:#f7f0dc; color:#947c39; }
+.transaction-status.failed { background:#f7e9e1; color:#a16848; }
+.transaction-empty { display:grid; justify-items:center; gap:7px; padding:30px 14px; color:#879183; text-align:center; }
+.transaction-empty>svg { color:#849675; }
+.transaction-empty strong { color:#50614f; font-size:11px; }
+.transaction-empty p { margin:0; font-size:9px; }
+.transaction-pager { display:flex; align-items:center; justify-content:space-between; gap:10px; padding-top:12px; color:#838c80; font-size:9px; }
+.transaction-pager>div { display:flex; gap:6px; }
+.transaction-pager button { min-height:30px; height:30px; gap:5px; font-size:8px; }
+.admin-transaction-filters { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+.admin-transaction-search { display:flex; align-items:center; gap:7px; width:min(380px,100%); min-height:34px; padding:0 9px; border:1px solid #e3e5db; border-radius:7px; background:#fffefa; color:#879183; }
+.admin-transaction-search input { width:100%; min-width:0; border:0; outline:0; background:transparent; color:#59685a; font-size:9px; }
+.admin-transaction-status-filter { display:flex; align-items:center; gap:7px; color:#7e897d; font-size:9px; }
+.admin-transaction-status-filter select { min-height:34px; padding:0 9px; border:1px solid #e3e5db; border-radius:7px; background:#fffefa; color:#59685a; font-size:9px; }
+.transaction-admin-table { min-width:1050px; }
+.transaction-admin-table code { white-space:nowrap; }
+.dark .transaction-card-heading h2,.dark .transaction-empty strong { color:#e2ebdf; }
+.dark .transaction-card-heading p,.dark .transaction-table td,.dark .transaction-pager,.dark .transaction-empty { color:#a4b0a2; }
+.dark .transaction-table th,.dark .transaction-table td { border-color:#344239; }
+.dark .transaction-table td strong,.dark .transaction-table code,.dark .transaction-admin-table code { color:#d2dfcf; }
+.dark .transaction-method { color:#c3d0bf; }
+.dark .transaction-method svg { color:#bfd0ae; }
+.dark .transaction-status.paid { background:#253b2a; border-color:#395341; color:#c5dbba; }
+.dark .transaction-status.pending,.dark .transaction-status.initializing { background:#3b351f; border-color:#53482c; color:#e3d18b; }
+.dark .transaction-status.failed { background:#402f24; border-color:#59402e; color:#e5b991; }
+.dark .transaction-status { background:#26352b; border-color:#39483d; color:#c3d0bf; }
+.dark .admin-transaction-search,.dark .admin-transaction-status-filter select { background:#111b15; border-color:#405044; color:#edf2eb; }
+.dark .admin-transaction-search input { color:#edf2eb; }
+.dark .admin-transaction-status-filter { color:#b7c4b4; }
+@media(max-width:600px) {
+  .transaction-card { padding:13px; }
+  .transaction-pager { align-items:flex-start; flex-direction:column; }
+  .admin-transaction-filters { align-items:stretch; flex-direction:column; }
+  .admin-transaction-search { width:100%; }
+  .admin-transaction-status-filter { justify-content:space-between; }
+  .admin-transaction-status-filter select { flex:1; }
+}
 .subscription-error { padding:15px; border:1px solid #e7d3c5; border-radius:10px; background:#fff8f3; color:#8f5b3d; font-size:11px; }
 
 .admin-subscription-page { display:grid; gap:14px; min-width:0; }

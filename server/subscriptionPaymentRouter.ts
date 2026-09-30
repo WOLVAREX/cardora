@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ownerSubscriptions, subscriptionPayments, subscriptionPlans, users } from "../drizzle/schema";
 import { normalizePhone } from "./cardora";
@@ -22,6 +22,29 @@ function requirePaystack() {
 const planInput = z.object({ planId: z.number().int().positive() });
 
 export const subscriptionPaymentRouter = router({
+  history: protectedProcedure.input(z.object({ page: z.number().int().min(0).default(0), pageSize: z.number().int().min(10).max(100).default(20) })).query(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const rows = await db.select({
+      id: subscriptionPayments.id,
+      reference: subscriptionPayments.reference,
+      amountMinor: subscriptionPayments.amountMinor,
+      currency: subscriptionPayments.currency,
+      billingInterval: subscriptionPayments.billingInterval,
+      status: subscriptionPayments.status,
+      providerChannel: subscriptionPayments.providerChannel,
+      paidAt: subscriptionPayments.paidAt,
+      periodEndAt: subscriptionPayments.periodEndAt,
+      createdAt: subscriptionPayments.createdAt,
+      planName: subscriptionPlans.name,
+    }).from(subscriptionPayments)
+      .leftJoin(subscriptionPlans, eq(subscriptionPayments.planId, subscriptionPlans.id))
+      .where(eq(subscriptionPayments.ownerId, ctx.user.id))
+      .orderBy(desc(subscriptionPayments.createdAt))
+      .limit(input.pageSize).offset(input.page * input.pageSize);
+    const [total] = await db.select({ total: count() }).from(subscriptionPayments).where(eq(subscriptionPayments.ownerId, ctx.user.id));
+    return { rows, total: Number(total?.total ?? 0), page: input.page, pageSize: input.pageSize };
+  }),
+
   startCard: protectedProcedure.input(planInput).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
     const paystack = requirePaystack();

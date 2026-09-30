@@ -25,6 +25,7 @@ function Router() {
         <Route path="/contacts" component={Home} />
         <Route path="/notifications" component={Home} />
         <Route path="/plan-usage" component={Home} />
+        <Route path="/transactions" component={Home} />
         <Route path="/account-settings" component={Home} />
         <Route path="/settings" component={Home} />
         <Route path="/login" component={AuthPage} />

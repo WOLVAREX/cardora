@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BadgeCheck, Bell, BookOpen, Check, ChevronRight, ClipboardList, Copy, CreditCard, Download, ExternalLink, FileDown, Globe2, LayoutDashboard, Link2, LogOut, Mail, Menu, MoreHorizontal, Plus, Settings, ShieldCheck, Smartphone, Users, X } from "lucide-react";
+import { BadgeCheck, Bell, BookOpen, Check, ChevronRight, ClipboardList, Copy, CreditCard, Download, ExternalLink, FileDown, Globe2, LayoutDashboard, Link2, LogOut, Mail, Menu, MoreHorizontal, Plus, Receipt, Settings, ShieldCheck, Smartphone, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -9,6 +9,7 @@ import { ContactsView } from "./ContactsView";
 import { NotificationsView } from "./NotificationsView";
 import { SettingsView } from "./SettingsView";
 import { SubscriptionView } from "./SubscriptionView";
+import { TransactionsView } from "./TransactionsView";
 import { ThemeToggle } from "./ThemeToggle";
 import { trpc } from "@/lib/trpc";
 import type { PublicUser } from "../../../../drizzle/schema";
@@ -16,13 +17,14 @@ import { safeShareUrl } from "@/lib/cardora";
 import type { CollectionList, DashboardData } from "@/lib/cardora-types";
 import { useLocation } from "wouter";
 
-type Tab = "overview" | "collections" | "contacts" | "notifications" | "subscription" | "settings";
+type Tab = "overview" | "collections" | "contacts" | "notifications" | "subscription" | "transactions" | "settings";
 const navItems: Array<{ id: Tab; label: string; icon: typeof LayoutDashboard }> = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "collections", label: "Collections", icon: BookOpen },
   { id: "contacts", label: "Contacts", icon: Users },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "subscription", label: "Plan & usage", icon: CreditCard },
+  { id: "transactions", label: "Transactions", icon: Receipt },
 ];
 const tabPaths: Record<Tab, string> = {
   overview: "/overview",
@@ -30,6 +32,7 @@ const tabPaths: Record<Tab, string> = {
   contacts: "/contacts",
   notifications: "/notifications",
   subscription: "/plan-usage",
+  transactions: "/transactions",
   settings: "/account-settings",
 };
 function tabForPath(path: string): Tab {
@@ -121,6 +124,7 @@ export function Dashboard({ user, onLogout }: { user: PublicUser; onLogout: () =
           {tab === "contacts" && <ContactsView collections={collections} initialCollectionId={activeCollection} smsEligible={data?.profile.smsEligible ?? false} />}
           {tab === "notifications" && <NotificationsView collections={collections} initialCollectionId={activeCollection} capacityFollowup={capacityFollowup} smsEligible={data?.profile.smsEligible ?? false} smsVisible={data?.profile.phoneCountryCode === "KE"} emailConfigured={data?.profile.emailDeliveryConfigured ?? false} />}
           {tab === "subscription" && <SubscriptionView />}
+          {tab === "transactions" && <TransactionsView />}
           {tab === "settings" && <SettingsView user={user} profile={data?.profile} onSaved={() => query.refetch()} />}
         </div>
         <footer className="dashboard-footer"><span>Cardora <span className="footer-dot">·</span> Made to keep good connections close.</span><a href="/privacy">Privacy disclosure</a></footer>

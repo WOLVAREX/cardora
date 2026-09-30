@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, BadgeCheck, BarChart3, Bell, ChevronLeft, ChevronRight, CircleAlert, CreditCard, Globe2, LayoutDashboard, Link2, LogOut, Mail, Menu, RefreshCw, ShieldCheck, Smartphone, Users, X } from "lucide-react";
+import { Activity, BadgeCheck, BarChart3, Bell, ChevronLeft, ChevronRight, CircleAlert, CreditCard, Globe2, LayoutDashboard, Link2, LogOut, Mail, Menu, Receipt, RefreshCw, ShieldCheck, Smartphone, Users, X } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import type { PublicUser } from "../../../../drizzle/schema";
@@ -8,16 +8,18 @@ import type { CardoraOutputs } from "@/lib/cardora-types";
 import { ThemeToggle } from "./ThemeToggle";
 import { flagForCountry } from "@/lib/cardora";
 import { SubscriptionManagementView } from "./SubscriptionManagementView";
+import { AdminTransactionsView } from "./AdminTransactionsView";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type AdminUserRow = CardoraOutputs["admin"]["users"]["rows"][number];
 
-type AdminTab = "overview" | "accounts" | "subscriptions" | "collections" | "campaigns";
+type AdminTab = "overview" | "accounts" | "subscriptions" | "transactions" | "collections" | "campaigns";
 const tabs: Array<{ id: AdminTab; label: string; icon: typeof LayoutDashboard }> = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "accounts", label: "Accounts", icon: Users },
   { id: "subscriptions", label: "Subscriptions", icon: CreditCard },
+  { id: "transactions", label: "Transactions", icon: Receipt },
   { id: "collections", label: "Collections", icon: Link2 },
   { id: "campaigns", label: "Campaigns", icon: Bell },
 ];
@@ -66,7 +68,7 @@ export function AdminDashboard({ user, onLogout }: { user: PublicUser; onLogout:
     <main className="admin-main">
       <header className="admin-topbar"><div className="admin-topbar-leading"><button type="button" className="admin-mobile-menu" aria-label={mobileMenuOpen ? "Close admin navigation" : "Open admin navigation"} aria-controls="admin-navigation" aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen(open => !open)}>{mobileMenuOpen ? <X size={19} /> : <Menu size={19} />}</button><div><span className="admin-breadcrumb">Cardora <ChevronRight size={13} /> Administration <ChevronRight size={13} /> <strong>{tabs.find(item => item.id === tab)?.label}</strong></span><span className="admin-topbar-caption">Platform operations and account health</span></div></div><div className="admin-topbar-actions"><span className="admin-protected"><ShieldCheck size={15} /> Admin-only</span><ThemeToggle /><button type="button" className="admin-refresh" aria-label="Refresh dashboard" onClick={() => { void overview.refetch(); void nena.refetch(); toast.success("Dashboard refreshed."); }}><RefreshCw size={16} /></button></div></header>
       <section className="admin-page-content">
-        <div className="admin-page-heading"><div><div className="eyebrow">CARDORA · PLATFORM OPERATIONS</div><h1>{tab === "overview" ? "A clear view of the whole platform." : tabs.find(item => item.id === tab)?.label}</h1><p className="admin-subtitle">{tab === "overview" ? "Monitor growth, collection capacity, consent and provider readiness from one private workspace." : tab === "accounts" ? "Review owner accounts, role assignment and phone-verification status." : tab === "subscriptions" ? "Edit plan tiers, account-wide contact/link caps, prices and user assignments." : tab === "collections" ? "Inspect country rules, capacity and activity across every collection link." : "Review notification campaigns and confirmed provider queue outcomes."}</p></div><span className="admin-date"><Activity size={15} /> Live database view</span></div>
+        <div className="admin-page-heading"><div><div className="eyebrow">CARDORA · PLATFORM OPERATIONS</div><h1>{tab === "overview" ? "A clear view of the whole platform." : tabs.find(item => item.id === tab)?.label}</h1><p className="admin-subtitle">{tab === "overview" ? "Monitor growth, collection capacity, consent and provider readiness from one private workspace." : tab === "accounts" ? "Review owner accounts, role assignment and phone-verification status." : tab === "subscriptions" ? "Edit plan tiers, account-wide contact/link caps, prices and user assignments." : tab === "transactions" ? "Review every subscription payment, its owner, provider, reference and current status." : tab === "collections" ? "Inspect country rules, capacity and activity across every collection link." : "Review notification campaigns and confirmed provider queue outcomes."}</p></div><span className="admin-date"><Activity size={15} /> Live database view</span></div>
         {tab === "collections" && <div className="admin-filter-row"><input className="admin-search" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} placeholder="Search title, slug, status or owner" aria-label="Search collections by title, slug, status or owner" /></div>}
         {tab === "campaigns" && <div className="admin-filter-row"><input className="admin-search" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} placeholder="Search subject, channel, status or owner" aria-label="Search campaigns by subject, channel, status or owner" /></div>}
         {overview.error && <div className="admin-error"><CircleAlert size={17} /> {overview.error.message}</div>}
@@ -100,6 +102,7 @@ export function AdminDashboard({ user, onLogout }: { user: PublicUser; onLogout:
 
         {tab === "campaigns" && <section className="admin-panel admin-table-card"><div className="admin-panel-head"><div><span className="admin-panel-icon citrus"><Bell size={16} /></span><div><h2>Notification campaigns</h2><p>Only provider-confirmed queue counts are represented as queued.</p></div></div></div><div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Campaign</th><th>Owner</th><th>Channel</th><th>Eligible</th><th>Queued</th><th>Skipped</th><th>State</th><th>Created</th></tr></thead><tbody>{(campaigns.data?.rows ?? []).map(row => <tr key={row.id}><td><strong>{row.subject}</strong><small>Collection #{row.collectionId}</small></td><td>Owner #{row.ownerId}</td><td><span className="admin-channel">{row.channel === "email" ? <Mail size={13} /> : <Smartphone size={13} />}{row.channel}</span></td><td>{number(row.eligibleRecipientCount)}</td><td>{number(row.queuedRecipientCount)}</td><td>{number(row.skippedRecipientCount)}</td><td><span className={`admin-badge ${row.status}`}>{row.status.replaceAll("_", " ")}</span></td><td>{formatDate(row.sentAt ?? row.createdAt)}</td></tr>)}</tbody></table></div><Pager page={page} total={campaigns.data?.total} pageCount={pageCount} onChange={setPage} /></section>}
         {tab === "subscriptions" && <SubscriptionManagementView />}
+        {tab === "transactions" && <AdminTransactionsView />}
       </section>
     </main>
   </div>;
