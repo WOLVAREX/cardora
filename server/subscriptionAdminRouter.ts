@@ -111,13 +111,13 @@ export const subscriptionAdminRouter = router({
             billingInterval: input.billingInterval,
             isActive: input.isActive,
             isDefault: input.isDefault,
-          });
-          planId = Number(created.insertId);
+          }).returning({ id: subscriptionPlans.id });
+          planId = created.id;
         }
       });
     } catch (error) {
       if (error instanceof TRPCError) throw error;
-      if (String(error).includes("ER_DUP_ENTRY")) throw new TRPCError({ code: "CONFLICT", message: "A plan with that code already exists." });
+      if (String(error).includes("ER_DUP_ENTRY") || (typeof error === "object" && error !== null && "code" in error && error.code === "23505")) throw new TRPCError({ code: "CONFLICT", message: "A plan with that code already exists." });
       throw error;
     }
     const [saved] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, planId!)).limit(1);

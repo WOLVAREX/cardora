@@ -96,7 +96,7 @@ async function main() {
       .set({ emailAuthEmail: email, passwordHash })
       .where(and(eq(users.id, userId), eq(users.openId, account.openId), sql`${users.emailAuthEmail} IS NULL`, sql`${users.passwordHash} IS NULL`));
 
-    if (result[0].affectedRows !== 1) throw new Error("The account changed while migration was in progress; no credentials were attached.");
+    if (result.rowCount !== 1) throw new Error("The account changed while migration was in progress; no credentials were attached.");
     process.stdout.write(`Email/password access attached to legacy user ${userId}. Existing role, ID, email, profile, collections and contacts were preserved.\n`);
   } finally {
     prompts.close();

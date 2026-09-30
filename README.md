@@ -4,16 +4,16 @@ React / Express / tRPC / Drizzle starter, adapted from the Sandbox web-db-user t
 
 - `pnpm dev`: development server; honors `PORT` (default 3000).
 - `pnpm build` / `pnpm start`: build and serve `dist/index.js` and `dist/public/`.
-- `pnpm db:migrate`: apply checked-in migrations. `pnpm db:push`: generate and apply new schema changes.
+- `pnpm db:migrate`: apply PostgreSQL migrations from `drizzle/postgres`. `pnpm db:push`: generate and apply new schema changes.
 - `pnpm check` / `pnpm test`: types and application tests.
 
 Cardora account login uses email/password with scrypt hashes and revocable database sessions. Per-owner Gmail authorization remains a separate Google OAuth integration.
 
 ## Authentication rollout
 
-- Apply the checked-in additive schema migrations with `pnpm db:migrate` against the intended MySQL database before serving the new application code. The migrations keep existing user IDs, OAuth identifiers, roles, profiles and collection data; they do not create passwords for existing accounts.
+- Cardora uses PostgreSQL. Apply migrations in `drizzle/postgres` with `pnpm db:migrate` before serving the application. The root-level SQL files are historical MySQL migrations and must not be applied to PostgreSQL.
 - Public sign-up never links to a pre-existing account by email. Existing owners may be enabled separately by an operator on the production VPS with `pnpm exec tsx scripts/migrate-legacy-email-account.ts`. The script requires the exact legacy user ID and matching stored email, refuses duplicate/ambiguous identities, hides password entry, and asks for an explicit typed confirmation. It updates only `emailAuthEmail` and `passwordHash` on that account row.
-- Do not run the legacy migration as part of application startup or deployment. Operators should point `DATABASE_URL` at the intended production database and run it once for each deliberately selected account.
+- Do not run the legacy account migration as part of application startup or deployment. Operators should point `DATABASE_URL` at the intended PostgreSQL database and run the script once for each deliberately selected account.
 
 ## Subscriptions and quotas
 

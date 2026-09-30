@@ -124,12 +124,12 @@ export const cardoraRouter = router({
             contactLimit: input.contactLimit,
             usedSlots: 0,
             status: "open",
-          });
-          return Number(inserted.insertId);
+          }).returning({ id: collections.id });
+          return inserted.id;
         });
       } catch (error) {
         if (error instanceof TRPCError) throw error;
-        if (String(error).includes("cardora_collections_slug_unique") || String(error).includes("ER_DUP_ENTRY")) {
+        if (String(error).includes("cardora_collections_slug_unique") || String(error).includes("ER_DUP_ENTRY") || (typeof error === "object" && error !== null && "code" in error && error.code === "23505")) {
           throw new TRPCError({ code: "CONFLICT", message: "That link name is already in use. Choose another one." });
         }
         throw error;
@@ -433,8 +433,8 @@ export const cardoraRouter = router({
         ownerId: ctx.user.id, collectionId: collection.id, channel: input.channel,
         subject: input.subject, message: input.message, eligibleRecipientCount: recipientCount,
         recipientSnapshotHash: recipientSnapshot, status: "not_sent",
-      });
-      const campaignId = Number(inserted.insertId);
+      }).returning({ id: campaigns.id });
+      const campaignId = inserted.id;
       return {
         campaignId,
         collectionId: collection.id,

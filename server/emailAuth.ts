@@ -133,7 +133,7 @@ export async function signUpWithEmail(input: { name: string; email: string; pass
       loginMethod: "email",
       role: "user",
       lastSignedIn: new Date(),
-    }).$returningId();
+    }).returning({ id: users.id });
     newId = inserted.id;
   } catch (error) {
     if (isDuplicateKeyError(error)) {
@@ -200,5 +200,5 @@ export async function signOut(req: Request, res: Response): Promise<void> {
 
 function isDuplicateKeyError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error &&
-    ((error as { code?: string }).code === "ER_DUP_ENTRY" || (error as { code?: string }).code === "SQLITE_CONSTRAINT_UNIQUE");
+    ["23505", "ER_DUP_ENTRY", "SQLITE_CONSTRAINT_UNIQUE"].includes((error as { code?: string }).code ?? "");
 }

@@ -64,7 +64,10 @@ export function registerCardoraGoogleOAuthRoutes(app: Express) {
         gmailAddress: identity.email,
         ...encrypted,
         grantedScopes: tokens.scope,
-      }).onDuplicateKeyUpdate({ set: { gmailAddress: identity.email, ...encrypted, grantedScopes: tokens.scope, updatedAt: new Date() } });
+      }).onConflictDoUpdate({
+        target: gmailConnections.ownerId,
+        set: { gmailAddress: identity.email, ...encrypted, grantedScopes: tokens.scope, updatedAt: new Date() },
+      });
       res.redirect(302, "/?gmail=connected");
     } catch (error) {
       console.error("[Cardora Gmail OAuth] Callback failed", error instanceof Error ? error.name : "unknown");
