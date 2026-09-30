@@ -79,7 +79,7 @@ export function SettingsView({ user, profile, onSaved }: { user: PublicUser; pro
         <div className="settings-field">
           <label className="field-label" htmlFor="account-gmail">Gmail address <span className="label-required">required</span></label>
           <div className="input-with-icon"><Mail size={15} /><Input id="account-gmail" type="email" autoComplete="email" placeholder="you@gmail.com" value={gmail} onChange={event => setGmail(event.target.value)} /></div>
-          <p className="field-hint">This saved address receives Cardora email notifications. You can change it any time; sending email updates requires a separate Gmail connection below.</p>
+          <p className="field-hint">This address receives account notices. Contributor email campaigns are sent through Cardora’s verified Brevo sender.</p>
           <Button className="primary-button settings-save" onClick={() => saveGmail.mutate({ email: gmail.trim() })} disabled={!validGmail || saveGmail.isPending}>{saveGmail.isPending ? "Saving…" : "Save Gmail address"}</Button>
         </div>
         <div className="settings-field">
@@ -91,9 +91,9 @@ export function SettingsView({ user, profile, onSaved }: { user: PublicUser; pro
       </section>
 
       <section className="content-card settings-card gmail-settings">
-        <div className="settings-section-heading"><span className="settings-icon"><Mail size={17} /></span><div><h2>Gmail connection</h2><p>Optional connection for sending Cardora email notifications.</p></div></div>
+        <div className="settings-section-heading"><span className="settings-icon"><Mail size={17} /></span><div><h2>Gmail connection</h2><p>Optional Gmail integration. Contributor campaigns use Cardora’s Brevo sender.</p></div></div>
         {googleConnected ? <div className="verification-state verified"><BadgeCheck size={19} /><div><strong>Gmail connected</strong><span>{profile?.gmailAddress} · Send-only permission</span></div></div> : <div className="verification-state pending"><CircleAlert size={19} /><div><strong>{googleConfigured ? "Ready to connect" : "Gmail sending isn’t enabled here yet"}</strong><span>{googleConfigured ? "Google will ask you to authorize Cardora’s send-only Gmail access." : "Your saved notification email remains available above. Gmail connection can be enabled when OAuth setup is ready."}</span></div></div>}
-        <div className="provider-notice gmail-provider-notice"><div><span className={`status-dot ${googleConnected ? "ready" : "muted"}`} /><strong>{googleConnected ? "Authorized Gmail sender" : googleConfigured ? "No Gmail sender connected" : "Saved email notifications"}</strong></div><p>Cardora requests Gmail sending permission only. It does not read your inbox. You can disconnect the account here at any time.</p>
+        <div className="provider-notice gmail-provider-notice"><div><span className={`status-dot ${googleConnected ? "ready" : "muted"}`} /><strong>{googleConnected ? "Authorized Gmail account" : googleConfigured ? "Gmail integration ready" : "Gmail integration unavailable"}</strong></div><p>Cardora requests Gmail sending permission only for any future Gmail features. Contributor email campaigns are sent using Cardora’s verified Brevo sender. You can disconnect this Gmail account here at any time.</p>
           {googleConnected ? <Button variant="outline" onClick={() => disconnectGmail.mutate()} disabled={disconnectGmail.isPending}>{disconnectGmail.isPending ? "Disconnecting…" : "Disconnect Gmail"}</Button> : googleConfigured ? <Button className="primary-button" onClick={() => connectGmail.mutate()} disabled={!validGmail || connectGmail.isPending}>{connectGmail.isPending ? "Starting secure connection…" : <>Connect {gmail.trim() || "Gmail"} <ExternalLink size={15} /></>}</Button> : null}
         </div>
       </section>

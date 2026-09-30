@@ -27,6 +27,7 @@ export default function CollectionPage() {
   const [email, setEmail] = useState("");
   const [emailOptIn, setEmailOptIn] = useState(false);
   const [smsOptIn, setSmsOptIn] = useState(false);
+  const [vcfOptIn, setVcfOptIn] = useState(false);
   const [consent, setConsent] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [accountLimitReached, setAccountLimitReached] = useState(false);
@@ -115,6 +116,7 @@ export default function CollectionPage() {
       email: emailOptIn ? email.trim() : "",
       emailOptIn,
       smsOptIn: smsOptIn && contactPhoneIsKenyan,
+      vcfOptIn,
       consent: true,
     });
   }
@@ -199,17 +201,23 @@ export default function CollectionPage() {
               <span><strong>Text me updates</strong><small>Optional. Only if you choose to receive texts.</small></span>
               <Smartphone size={16} className="opt-icon" />
             </label>}
+            <label className="consent-toggle">
+              <input type="checkbox" checked={vcfOptIn} onChange={event => setVcfOptIn(event.target.checked)} />
+              <span className="custom-check"><Check size={12} /></span>
+              <span><strong>Include me in the shared VCF</strong><small>Optional. If selected, other contributors who receive the download link can see your name, phone and opted-in email.</small></span>
+              <Users size={16} className="opt-icon" />
+            </label>
           </div>
           <label className="required-consent">
             <input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} required />
             <span className="required-consent-box" aria-hidden="true" />
-            <span className="required-consent-text">I agree to share my name and phone number with the collection owner so my contact can be added to their VCF.</span>
+            <span className="required-consent-text">I agree to share my name and phone number with the collection owner so my contact can be added to this collection.</span>
           </label>
           {submit.error && <div className="form-error">{submit.error.message}</div>}
           <Button type="submit" className="primary-button submit-contact" disabled={submit.isPending || !consent}>
             {submit.isPending ? "Adding you…" : <>Add my contact <ArrowRight size={16} /></>}
           </Button>
-          <div className="privacy-note"><LockKeyhole size={13} /><span>Only your name and phone are needed for the VCF. You can change optional notification preferences at any time.</span></div>
+          <div className="privacy-note"><LockKeyhole size={13} /><span>Your contact details are shared with other contributors only if you select “Include me in the shared VCF.” You can change notification preferences at any time.</span></div>
         </form>}
       </section>
     </main>

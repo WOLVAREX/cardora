@@ -44,6 +44,7 @@ export function Dashboard({ user, onLogout }: { user: PublicUser; onLogout: () =
     if (location !== tabPaths[next]) setLocation(tabPaths[next]);
   };
   const [activeCollection, setActiveCollection] = useState<number | undefined>();
+  const [capacityFollowup, setCapacityFollowup] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   useEffect(() => {
     if (!mobileMenuOpen) return;
@@ -74,6 +75,7 @@ export function Dashboard({ user, onLogout }: { user: PublicUser; onLogout: () =
   }, [query]);
 
   useEffect(() => { setTabState(tabForPath(location)); }, [location]);
+  useEffect(() => { if (tab !== "notifications") setCapacityFollowup(false); }, [tab]);
 
   function manageContacts(id: number) {
     setActiveCollection(id);
@@ -89,14 +91,14 @@ export function Dashboard({ user, onLogout }: { user: PublicUser; onLogout: () =
           <span className="nav-overline">WORKSPACE</span>
           {navItems.map(item => {
             const Icon = item.icon;
-            return <button key={item.id} className={`nav-item ${tab === item.id ? "active" : ""}`} aria-current={tab === item.id ? "page" : undefined} onClick={() => { setTab(item.id); setMobileMenuOpen(false); }}><Icon size={17} strokeWidth={1.8} /><span>{item.label}</span>{item.id === "notifications" && unreadAlerts > 0 && <i className="nav-count">{unreadAlerts}</i>}</button>;
+            return <button key={item.id} className={`nav-item ${tab === item.id ? "active" : ""}`} aria-current={tab === item.id ? "page" : undefined} onClick={() => { if (item.id === "notifications") setCapacityFollowup(false); setTab(item.id); setMobileMenuOpen(false); }}><Icon size={17} strokeWidth={1.8} /><span>{item.label}</span>{item.id === "notifications" && unreadAlerts > 0 && <i className="nav-count">{unreadAlerts}</i>}</button>;
           })}
           <span className="nav-overline nav-overline-lower">PREFERENCES</span>
           <button className={`nav-item ${tab === "settings" ? "active" : ""}`} aria-current={tab === "settings" ? "page" : undefined} onClick={() => { setTab("settings"); setMobileMenuOpen(false); }}><Settings size={17} strokeWidth={1.8} /><span>Account settings</span></button>
           {user.role === "admin" && <a className="nav-item admin-nav-link" href="/admin" onClick={() => setMobileMenuOpen(false)}><ShieldCheck size={17} strokeWidth={1.8} /><span>Admin dashboard</span></a>}
         </nav>
         <div className="sidebar-bottom">
-          <div className="privacy-mini"><ShieldCheck size={17} /><div><strong>Your contacts stay yours</strong><span>Only you can see your collections.</span></div></div>
+          <div className="privacy-mini"><ShieldCheck size={17} /><div><strong>Contributor choices matter</strong><span>Shared VCFs include opt-in contacts only.</span></div></div>
           <button className="sidebar-user" onClick={onLogout}><span className="user-avatar">{(user.name || user.email || "C").slice(0, 1).toUpperCase()}</span><span className="user-copy"><strong>{user.name || "Account"}</strong><small>{user.email || "Email not provided"}</small></span><LogOut size={16} /></button>
         </div>
       </aside>
@@ -109,14 +111,14 @@ export function Dashboard({ user, onLogout }: { user: PublicUser; onLogout: () =
       {mobileMenuOpen && <button type="button" className="mobile-nav-backdrop" aria-label="Close navigation menu" onClick={() => setMobileMenuOpen(false)} />}
 
       <main className="main-area">
-        <header className="topbar"><div className="breadcrumbs"><span>Workspace</span><ChevronRight size={14} /><strong>{tab === "settings" ? "Account settings" : navItems.find(item => item.id === tab)?.label}</strong></div><div className="topbar-right"><span className="secure-note"><ShieldCheck size={15} /> Private by default</span><ThemeToggle /><button className="bell-button" aria-label="Notifications" onClick={() => { setTab("notifications"); setMobileMenuOpen(false); if (unreadAlerts) markRead.mutate(); }}><Bell size={18} />{unreadAlerts > 0 && <i />}</button><button type="button" className="topbar-profile-button" aria-label="Open account settings" title="Account settings" onClick={() => { setTab("settings"); setMobileMenuOpen(false); }}><span className="topbar-avatar">{(user.name || user.email || "C").slice(0, 1).toUpperCase()}</span></button></div></header>
+        <header className="topbar"><div className="breadcrumbs"><span>Workspace</span><ChevronRight size={14} /><strong>{tab === "settings" ? "Account settings" : navItems.find(item => item.id === tab)?.label}</strong></div><div className="topbar-right"><span className="secure-note"><ShieldCheck size={15} /> Private by default</span><ThemeToggle /><button className="bell-button" aria-label="Notifications" onClick={() => { setCapacityFollowup(false); setTab("notifications"); setMobileMenuOpen(false); if (unreadAlerts) markRead.mutate(); }}><Bell size={18} />{unreadAlerts > 0 && <i />}</button><button type="button" className="topbar-profile-button" aria-label="Open account settings" title="Account settings" onClick={() => { setTab("settings"); setMobileMenuOpen(false); }}><span className="topbar-avatar">{(user.name || user.email || "C").slice(0, 1).toUpperCase()}</span></button></div></header>
 
         <div className="page-content">
-          {data?.alerts.some(alert => !alert.readAt) && tab === "overview" && (() => { const alert = data.alerts.find(item => !item.readAt)!; return <button className="capacity-alert" onClick={() => { setTab("notifications"); markRead.mutate(); }}><span className="alert-dot" /><span><strong>{alert.kind === "account_limit_reached" ? "Your account has reached its contact limit" : "A collection has reached capacity"}</strong><small>{alert.message}</small></span><ChevronRight size={17} /></button>; })()}
+          {data?.alerts.some(alert => !alert.readAt) && tab === "overview" && (() => { const alert = data.alerts.find(item => !item.readAt)!; return <button className="capacity-alert" onClick={() => { setActiveCollection(alert.collectionId); setCapacityFollowup(true); setTab("notifications"); markRead.mutate(); }}><span className="alert-dot" /><span><strong>{alert.kind === "account_limit_reached" ? "Your account has reached its contact limit" : "A collection has reached capacity"}</strong><small>{alert.message}</small><span className="capacity-alert-action">Review opted-in contributors and notification options</span></span><ChevronRight size={17} /></button>; })()}
           {tab === "overview" && <Overview data={data} loading={query.isLoading} email={user.email} onTab={setTab} onManage={manageContacts} />}
           {tab === "collections" && <CollectionsPage collections={collections} onManage={manageContacts} remainingCollections={data?.subscription.usage.collectionsRemaining} onPlanClick={() => setTab("subscription")} />}
           {tab === "contacts" && <ContactsView collections={collections} initialCollectionId={activeCollection} smsEligible={data?.profile.smsEligible ?? false} />}
-          {tab === "notifications" && <NotificationsView collections={collections} smsEligible={data?.profile.smsEligible ?? false} smsVisible={data?.profile.phoneCountryCode === "KE"} gmailConnected={data?.profile.gmailConnected ?? false} gmailConfigured={data?.profile.gmailConfigured ?? false} />}
+          {tab === "notifications" && <NotificationsView collections={collections} initialCollectionId={activeCollection} capacityFollowup={capacityFollowup} smsEligible={data?.profile.smsEligible ?? false} smsVisible={data?.profile.phoneCountryCode === "KE"} emailConfigured={data?.profile.emailDeliveryConfigured ?? false} />}
           {tab === "subscription" && <SubscriptionView />}
           {tab === "settings" && <SettingsView user={user} profile={data?.profile} onSaved={() => query.refetch()} />}
         </div>
@@ -144,7 +146,7 @@ function Overview({ data, loading, email, onTab, onManage }: { data?: DashboardD
       </section>
       <div className="bottom-grid">
         <section className="content-card getting-started"><div className="small-icon-circle"><Globe2 size={18} /></div><div><span className="eyebrow">HOW CARDORA WORKS</span><h2>From one link to a shared address book.</h2><p>Set your countries and contact cap. Cardora checks every number’s country calling code and closes the link when you reach your limit.</p><button className="text-button" onClick={() => onTab("collections")}>Explore collections <ChevronRight size={15} /></button></div></section>
-        <section className="integrations-card"><div className="integration-title"><span className="small-icon-circle"><Mail size={17} /></span><div><h3>Thoughtful notifications</h3><p>Reach people who chose to hear from you.</p></div></div><div className="integration-status"><span className={`status-dot ${data?.profile.gmailConnected ? "ready" : "muted"}`} />Gmail sender <b>{data?.profile.gmailConnected ? "Connected" : data?.profile.gmailConfigured ? "Ready to connect" : "Not configured yet"}</b></div><div className="integration-status"><span className={`status-dot ${data?.profile.smsEligible ? "ready" : "muted"}`} />SMS eligibility <b>{data?.profile.smsEligible ? "Verified Kenyan owner" : data?.profile.phoneCountryCode === "KE" ? "Verify Kenyan phone" : "Kenya only"}</b></div><button className="text-button" onClick={() => onTab("settings")}>Manage notification details <ChevronRight size={15} /></button></section>
+        <section className="integrations-card"><div className="integration-title"><span className="small-icon-circle"><Mail size={17} /></span><div><h3>Thoughtful notifications</h3><p>Reach people who chose to hear from you.</p></div></div><div className="integration-status"><span className={`status-dot ${data?.profile.emailDeliveryConfigured ? "ready" : "muted"}`} />Brevo email <b>{data?.profile.emailDeliveryConfigured ? "Available" : "Not configured"}</b></div><div className="integration-status"><span className={`status-dot ${data?.profile.smsEligible ? "ready" : "muted"}`} />SMS eligibility <b>{data?.profile.smsEligible ? "Verified Kenyan owner" : data?.profile.phoneCountryCode === "KE" ? "Verify Kenyan phone" : "Kenya only"}</b></div><button className="text-button" onClick={() => onTab("settings")}>Manage notification details <ChevronRight size={15} /></button></section>
       </div>
     </>
   );

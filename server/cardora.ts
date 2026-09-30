@@ -93,6 +93,7 @@ export function campaignReviewHash(input: {
   subject: string;
   message: string;
   recipientSnapshotHash: string;
+  vcfDownloadTokenHash?: string | null;
 }) {
   return createHash("sha256").update(JSON.stringify({ version: 1, ...input })).digest("hex");
 }

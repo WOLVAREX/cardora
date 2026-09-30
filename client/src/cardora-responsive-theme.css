@@ -415,6 +415,37 @@
 .notification-select-wrap { position:relative; }
 .notification-select-wrap>svg { position:absolute; top:50%; right:12px; color:#829080; pointer-events:none; transform:translateY(-50%); }
 .notification-select-wrap select { width:100%; padding-right:35px; appearance:none; }
+.recipient-picker { margin:12px 0; padding:12px; border:1px solid #e7ebdf; border-radius:9px; background:#fffefa; }
+.recipient-picker-head { display:flex; justify-content:space-between; align-items:center; gap:10px; color:#52634f; font-size:10px; }
+.recipient-picker-head .text-button { padding:4px; font-size:9px; }
+.recipient-picker-list { display:grid; gap:4px; max-height:250px; overflow:auto; margin-top:8px; }
+.recipient-picker-row { display:flex; align-items:center; gap:9px; min-width:0; padding:8px; border:1px solid #edf0e9; border-radius:7px; cursor:pointer; }
+.recipient-picker-row>input,.vcf-share-option>input { flex:0 0 auto; accent-color:#718b51; }
+.recipient-picker-row>span:nth-child(2) { display:grid; min-width:0; gap:3px; }
+.recipient-picker-row strong { overflow:hidden; color:#52634f; font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
+.recipient-picker-row small { color:#899285; font-size:8px; overflow-wrap:anywhere; }
+.recipient-channel-tags { display:flex; gap:4px; margin-left:auto; }
+.recipient-channel-tags i { padding:3px 5px; border-radius:10px; background:#edf2e8; color:#6a805c; font-size:7px; font-style:normal; }
+.vcf-share-option { display:flex; align-items:flex-start; gap:9px; margin:12px 0; padding:11px; border:1px solid #dce5d8; border-radius:8px; background:#f5f8f1; cursor:pointer; }
+.vcf-share-option.unavailable { opacity:.68; cursor:not-allowed; }
+.vcf-share-option span { display:grid; gap:4px; }
+.vcf-share-option strong,.campaign-download-preview strong { color:#52634f; font-size:10px; }
+.vcf-share-option small,.campaign-download-preview small { color:#818b7d; font-size:8px; line-height:1.5; }
+.campaign-download-preview { display:grid; gap:6px; margin-top:10px; padding:10px; border:1px solid #dce5d8; border-radius:7px; background:#f2f6ed; }
+.campaign-download-preview a { color:#587859; font-size:9px; overflow-wrap:anywhere; text-decoration:underline; }
+.notification-side .provider-card>div:first-of-type span { display:block; }
+.vcf-download-page { display:grid; width:min(100% - 32px,560px); min-height:70vh; margin:0 auto; align-content:center; }
+.vcf-download-card { display:grid; justify-items:start; gap:12px; padding:30px; border:1px solid #e1e7dc; border-radius:16px; background:#fffefa; box-shadow:0 14px 45px rgba(45,62,44,.08); }
+.vcf-download-card h1 { margin:0; color:#364838; font:500 clamp(28px,5vw,42px)/1.1 Georgia,serif; }
+.vcf-download-card p { margin:0; color:#718071; font-size:14px; line-height:1.65; }
+.vcf-download-card .vcf-expiry { color:#92998d; font-size:12px; }
+.vcf-download-button { display:inline-flex; align-items:center; gap:8px; margin-top:5px; }
+.vcf-download-success { display:flex; align-items:center; gap:6px; color:#5f8057!important; font-size:12px!important; }
+.dark .recipient-picker,.dark .recipient-picker-row,.dark .campaign-download-preview,.dark .vcf-download-card { background:#18241c; border-color:#3a483b; }
+.dark .recipient-picker-head,.dark .recipient-picker-row strong,.dark .vcf-share-option strong,.dark .campaign-download-preview strong,.dark .vcf-download-card h1 { color:#d2dfcc; }
+.dark .recipient-picker-row small,.dark .vcf-share-option small,.dark .campaign-download-preview small,.dark .vcf-download-card p { color:#a9b6a4; }
+.dark .vcf-share-option { background:#1d2a21; border-color:#3a483b; }
+.dark .campaign-download-preview a { color:#c5d9b8; }
 .notification-warning.provider-ready { border-color:#dce8d5; background:#f1f6ed; color:#6f8664; }
 .campaign-review { margin-top:17px; padding:16px; border:1px solid #dce5d8; border-radius:11px; background:#f8faf4; }
 .campaign-review-head { display:flex; align-items:center; gap:10px; margin-bottom:13px; }
@@ -478,6 +509,10 @@
   .campaign-review-actions button { flex:1; }
   .campaign-recipient-list li { align-items:flex-start; flex-direction:column; gap:3px; }
   .campaign-recipient-list code { text-align:left; }
+  .recipient-picker { padding:9px; }
+  .recipient-picker-row { align-items:flex-start; flex-wrap:wrap; }
+  .recipient-channel-tags { margin-left:27px; }
+  .vcf-download-card { padding:22px; }
   .admin-filter-row .admin-search { width:100%; }
   .verification-code-row { align-items:stretch; flex-direction:column; }
   .verification-code-row input { width:100%; max-width:none; }

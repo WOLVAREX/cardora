@@ -22,6 +22,26 @@ function mailConfig() {
 
 export function emailDeliveryConfigured() { return Boolean(mailConfig()); }
 
+function escapeEmailHtml(value: string) {
+  return value.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
+}
+
+export async function sendBrevoCampaignEmail(input: { to: string; subject: string; message: string; preferenceUrl: string; downloadUrl?: string }) {
+  const config = mailConfig();
+  if (!config) throw new Error("Cardora email delivery is not configured.");
+  const body = input.message.trim();
+  const textContent = [body, input.downloadUrl ? `Download the VCF: ${input.downloadUrl}` : "", `Manage email preferences: ${input.preferenceUrl}`].filter(Boolean).join("\n\n");
+  const htmlContent = `<div style="font-family:Arial,sans-serif;color:#334438;line-height:1.65"><p>${escapeEmailHtml(body).replace(/\r?\n/g, "<br>")}</p>${input.downloadUrl ? `<p><a href="${escapeEmailHtml(input.downloadUrl)}" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#d5ef76;color:#18231c;text-decoration:none;font-weight:bold">Open VCF download</a></p>` : ""}<p style="font-size:12px;color:#6f786e">Manage your email preferences: <a href="${escapeEmailHtml(input.preferenceUrl)}">unsubscribe</a></p></div>`;
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: { "api-key": config.apiKey, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ sender: { name: config.senderName, email: config.senderEmail }, to: [{ email: input.to }], subject: input.subject, textContent, htmlContent }),
+  });
+  if (!response.ok) throw new Error("Brevo did not confirm the email. Check the Brevo account and sender setup before retrying.");
+  const result = await response.json() as { messageId?: unknown };
+  return typeof result.messageId === "string" ? result.messageId : "accepted";
+}
+
 export async function sendEmailVerification(user: User): Promise<void> {
   const config = mailConfig();
   if (!config) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Email verification is not configured yet. Please contact Cardora support." });

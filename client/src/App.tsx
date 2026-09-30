@@ -10,6 +10,7 @@ import CollectionPage from "./pages/Collection";
 import PrivacyPage from "@/pages/Privacy";
 import AuthPage from "@/pages/Auth";
 import VerifyAccountPage from "@/pages/VerifyAccount";
+import PublicVcfDownloadPage from "@/pages/PublicVcfDownload";
 
 const AdminPage = lazy(() => import("./pages/Admin"));
 
@@ -30,6 +31,7 @@ function Router() {
         <Route path="/verify-account" component={VerifyAccountPage} />
         <Route path="/verify-email" component={VerifyAccountPage} />
         <Route path="/c/:slug" component={CollectionPage} />
+        <Route path="/vcf/:token" component={PublicVcfDownloadPage} />
         <Route path="/admin" component={AdminPage} />
         <Route path="/privacy" component={PrivacyPage} />
         <Route path={"/404"} component={NotFound} />

@@ -1,5 +1,5 @@
-import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
-import { and, count, desc, eq, gte, isNotNull, isNull } from "drizzle-orm";
+import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
+import { and, count, desc, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { campaigns, contacts, collections, gmailConnections, gmailOauthStates, ownerAlerts, phoneVerifications, users } from "../drizzle/schema";
@@ -11,6 +11,7 @@ import { onboardingProcedure, protectedProcedure, publicProcedure, router } from
 import { canonicalNenaNumber, createNenaClient, NenaProviderError } from "./cardoraNena";
 import { createCodeChallenge, createCodeVerifier, createGoogleConsentUrl, decryptRefreshToken, digestOAuthState, GoogleIntegrationError, googleOAuthConfig, refreshGoogleAccessToken, sendGmailMessage } from "./cardoraGoogle";
 import { disconnectOwnerGmail, GMAIL_STATE_COOKIE } from "./cardoraOAuth";
+import { emailDeliveryConfigured, sendBrevoCampaignEmail } from "./emailVerification";
 
 function requireDb() {
   return getDb().then(db => {
@@ -54,6 +55,7 @@ export const cardoraRouter = router({
         gmailConnected: Boolean(gmail[0] && ownerGmail && gmail[0].gmailAddress.toLowerCase() === ownerGmail.toLowerCase()),
         gmailAddress: gmail[0]?.gmailAddress ?? null,
         gmailConfigured: googleOAuthConfig().configured,
+        emailDeliveryConfigured: emailDeliveryConfigured(),
       },
       totalContacts: subscription.usage.acceptedContacts,
       openCollections: myCollections.filter(item => item.status === "open").length,
@@ -165,6 +167,7 @@ export const cardoraRouter = router({
       email: z.string().trim().email().max(320).optional().or(z.literal("")),
       emailOptIn: z.boolean().default(false),
       smsOptIn: z.boolean().default(false),
+      vcfOptIn: z.boolean().default(false),
       consent: z.literal(true),
     }).superRefine((input, issue) => {
       if (input.emailOptIn && !input.email) issue.addIssue({ code: "custom", path: ["email"], message: "Add an email address to opt into email updates." });
@@ -215,6 +218,7 @@ export const cardoraRouter = router({
           email: input.emailOptIn ? (input.email || null) : null,
           emailOptIn: input.emailOptIn,
           smsOptIn: input.smsOptIn,
+          vcfOptIn: input.vcfOptIn,
           consentVersion: "2026-09",
           unsubscribeToken,
           status: "accepted",
@@ -249,7 +253,7 @@ export const cardoraRouter = router({
       if (!owner) throw new TRPCError({ code: "NOT_FOUND", message: "Collection not found." });
       return db.select({
         id: contacts.id, name: contacts.name, phoneE164: contacts.phoneE164, countryCode: contacts.countryCode,
-        email: contacts.email, emailOptIn: contacts.emailOptIn, smsOptIn: contacts.smsOptIn,
+        email: contacts.email, emailOptIn: contacts.emailOptIn, smsOptIn: contacts.smsOptIn, vcfOptIn: contacts.vcfOptIn,
         status: contacts.status, createdAt: contacts.createdAt,
       }).from(contacts).where(and(eq(contacts.collectionId, input.collectionId), eq(contacts.status, "accepted"))).orderBy(desc(contacts.createdAt));
     }),
@@ -271,6 +275,20 @@ export const cardoraRouter = router({
       const people = await db.select({ name: contacts.name, phoneE164: contacts.phoneE164, email: contacts.email })
         .from(contacts).where(and(eq(contacts.collectionId, collection.id), eq(contacts.status, "accepted")));
       return { filename: `${collection.slug}.vcf`, count: people.length, content: buildVcf(people) };
+    }),
+    publicVcfDownload: publicProcedure.input(z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{40,50}$/) })).query(async ({ input }) => {
+      const db = await requireDb();
+      const tokenHash = createHash("sha256").update(input.token).digest("hex");
+      const [campaign] = await db.select({ id: campaigns.id, collectionId: campaigns.collectionId, status: campaigns.status, expiresAt: campaigns.vcfDownloadExpiresAt })
+        .from(campaigns).where(eq(campaigns.vcfDownloadTokenHash, tokenHash)).limit(1);
+      if (!campaign || !campaign.expiresAt || campaign.expiresAt.getTime() <= Date.now() || !["queued", "partial"].includes(campaign.status)) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "This shared VCF link has expired or is unavailable." });
+      }
+      const [collection] = await db.select({ title: collections.title, slug: collections.slug }).from(collections).where(eq(collections.id, campaign.collectionId)).limit(1);
+      if (!collection) throw new TRPCError({ code: "NOT_FOUND", message: "This shared VCF link is unavailable." });
+      const people = await db.select({ name: contacts.name, phoneE164: contacts.phoneE164, email: contacts.email, emailOptIn: contacts.emailOptIn })
+        .from(contacts).where(and(eq(contacts.collectionId, campaign.collectionId), eq(contacts.status, "accepted"), eq(contacts.vcfOptIn, true)));
+      return { title: collection.title, filename: `${collection.slug}.vcf`, count: people.length, content: buildVcf(people.map(person => ({ ...person, email: person.emailOptIn ? person.email : null }))), expiresAt: campaign.expiresAt };
     }),
     markAlertsRead: protectedProcedure.mutation(async ({ ctx }) => {
       const db = await requireDb();
@@ -404,32 +422,62 @@ export const cardoraRouter = router({
       channel: z.enum(["email", "sms"]),
       subject: z.string().trim().min(1).max(160),
       message: z.string().trim().min(1).max(4000),
+      contactIds: z.array(z.number().int().positive()).max(10000).optional(),
+      includeVcfDownload: z.boolean().default(false),
     })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const [collection] = await db.select({ id: collections.id, title: collections.title }).from(collections).where(and(
+      const [collection] = await db.select({ id: collections.id, title: collections.title, slug: collections.slug, canonicalUrl: collections.canonicalUrl, contactLimit: collections.contactLimit, usedSlots: collections.usedSlots, status: collections.status }).from(collections).where(and(
         eq(collections.id, input.collectionId), eq(collections.ownerId, ctx.user.id),
       )).limit(1);
       if (!collection) throw new TRPCError({ code: "NOT_FOUND", message: "Collection not found." });
+      const uniqueContactIds = input.contactIds ? [...new Set(input.contactIds)] : undefined;
+      if (input.contactIds && uniqueContactIds!.length !== input.contactIds.length) throw new TRPCError({ code: "BAD_REQUEST", message: "A contributor was selected more than once." });
       if (input.channel === "sms") {
         const [profile] = await db.select({ phoneE164: users.phoneE164, phoneCountryCode: users.phoneCountryCode, phoneVerifiedAt: users.phoneVerifiedAt }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
         if (!profile || !isKenyaSmsEligible(profile)) throw new TRPCError({ code: "FORBIDDEN", message: "SMS is available only to owners with a verified Kenyan (+254) number." });
       }
+      const filter = input.channel === "email"
+        ? and(eq(contacts.emailOptIn, true), isNotNull(contacts.email))
+        : and(eq(contacts.smsOptIn, true), eq(contacts.countryCode, "KE"));
       const eligibleContacts = await db.select({ id: contacts.id, name: contacts.name, phoneE164: contacts.phoneE164, email: contacts.email }).from(contacts).where(and(
         eq(contacts.collectionId, input.collectionId), eq(contacts.status, "accepted"),
-        input.channel === "email"
-          ? and(eq(contacts.emailOptIn, true), isNotNull(contacts.email))
-          : and(eq(contacts.smsOptIn, true), eq(contacts.countryCode, "KE")),
+        filter,
+        ...(uniqueContactIds ? [inArray(contacts.id, uniqueContactIds)] : []),
       )).orderBy(contacts.id);
+      if (uniqueContactIds && eligibleContacts.length !== uniqueContactIds.length) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "One or more selected contributors are no longer eligible for this channel. Refresh the recipient list and review it again." });
+      }
+      let downloadToken: string | null = null;
+      let downloadTokenHash: string | null = null;
+      let downloadExpiresAt: Date | null = null;
+      let downloadUrl: string | null = null;
+      if (input.includeVcfDownload) {
+        const entitlement = await getOwnerEntitlement(db, ctx.user.id);
+        const atCapacity = collection.status === "full" || collection.usedSlots >= collection.contactLimit || !entitlement.usage.canAcceptContact;
+        if (!atCapacity) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "A shared VCF download link is available after this collection or your account reaches its contact limit." });
+        const [shareCount] = await db.select({ total: count() }).from(contacts).where(and(
+          eq(contacts.collectionId, input.collectionId), eq(contacts.status, "accepted"), eq(contacts.vcfOptIn, true),
+        ));
+        if (!Number(shareCount?.total ?? 0)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No contributors have opted to include their details in the shared VCF yet." });
+        downloadToken = randomBytes(32).toString("base64url");
+        downloadTokenHash = createHash("sha256").update(downloadToken).digest("hex");
+        downloadExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        downloadUrl = `${new URL(collection.canonicalUrl).origin}/vcf/${downloadToken}`;
+      }
       const recipients = eligibleContacts.map(person => ({
         id: person.id,
         name: person.name,
         destination: input.channel === "email" ? (person.email ?? "") : person.phoneE164,
       }));
+      if (!recipients.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: `No contributors are eligible for ${input.channel === "email" ? "email" : "Kenyan SMS"} notifications.` });
       const recipientCount = recipients.length;
       const recipientSnapshot = campaignRecipientSnapshotHash(input.channel, input.subject, input.message, recipients);
       const [inserted] = await db.insert(campaigns).values({
         ownerId: ctx.user.id, collectionId: collection.id, channel: input.channel,
         subject: input.subject, message: input.message, eligibleRecipientCount: recipientCount,
+        recipientContactIds: recipients.map(person => person.id),
+        vcfDownloadTokenHash: downloadTokenHash,
+        vcfDownloadExpiresAt: downloadExpiresAt,
         recipientSnapshotHash: recipientSnapshot, status: "not_sent",
       }).returning({ id: campaigns.id });
       const campaignId = inserted.id;
@@ -440,11 +488,13 @@ export const cardoraRouter = router({
         channel: input.channel,
         subject: input.subject,
         message: input.message,
+        downloadUrl,
+        downloadToken,
         status: "not_sent" as const,
         recipientCount,
         recipients,
         recipientSnapshotHash: recipientSnapshot,
-        reviewHash: campaignReviewHash({ campaignId, collectionId: collection.id, channel: input.channel, subject: input.subject, message: input.message, recipientSnapshotHash: recipientSnapshot }),
+        reviewHash: campaignReviewHash({ campaignId, collectionId: collection.id, channel: input.channel, subject: input.subject, message: input.message, recipientSnapshotHash: recipientSnapshot, vcfDownloadTokenHash: downloadTokenHash }),
       };
     }),
     providerStatus: protectedProcedure.query(async ({ ctx }) => {
@@ -453,20 +503,32 @@ export const cardoraRouter = router({
       if (!profile || profile.phoneCountryCode !== "KE") throw new TRPCError({ code: "FORBIDDEN", message: "Kenyan SMS controls are not available for this account." });
       return createNenaClient().connectionStatus();
     }),
-    send: protectedProcedure.input(z.object({ campaignId: z.number().int().positive(), reviewHash: z.string().regex(/^[a-f0-9]{64}$/) })).mutation(async ({ ctx, input }) => {
+    send: protectedProcedure.input(z.object({ campaignId: z.number().int().positive(), reviewHash: z.string().regex(/^[a-f0-9]{64}$/), downloadToken: z.string().regex(/^[A-Za-z0-9_-]{40,50}$/).nullable().optional() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const reservation = await db.transaction(async tx => {
         const [campaign] = await tx.select().from(campaigns).where(and(eq(campaigns.id, input.campaignId), eq(campaigns.ownerId, ctx.user.id))).limit(1).for("update");
         if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campaign draft not found." });
         if (campaign.status !== "not_sent") throw new TRPCError({ code: "CONFLICT", message: "This campaign has already been sent or is being processed." });
+        if (campaign.vcfDownloadTokenHash) {
+          const suppliedHash = input.downloadToken ? createHash("sha256").update(input.downloadToken).digest("hex") : "";
+          if (suppliedHash !== campaign.vcfDownloadTokenHash || !campaign.vcfDownloadExpiresAt || campaign.vcfDownloadExpiresAt.getTime() <= Date.now()) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The shared VCF link expired. Prepare a fresh campaign and review it again." });
+          }
+        } else if (input.downloadToken) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This campaign has no shared VCF link." });
+        }
         const [collection] = await tx.select({ id: collections.id, title: collections.title, slug: collections.slug, canonicalUrl: collections.canonicalUrl }).from(collections).where(and(eq(collections.id, campaign.collectionId), eq(collections.ownerId, ctx.user.id))).limit(1);
         if (!collection) throw new TRPCError({ code: "NOT_FOUND", message: "Collection not found." });
+        const selectedIds = campaign.recipientContactIds;
+        const selectedFilter = selectedIds === null ? undefined : selectedIds.length ? inArray(contacts.id, selectedIds) : inArray(contacts.id, [-1]);
         const eligibleContacts = campaign.channel === "sms"
           ? await tx.select({ id: contacts.id, name: contacts.name, phoneE164: contacts.phoneE164, email: contacts.email, unsubscribeToken: contacts.unsubscribeToken }).from(contacts).where(and(
             eq(contacts.collectionId, collection.id), eq(contacts.status, "accepted"), eq(contacts.smsOptIn, true), eq(contacts.countryCode, "KE"),
+            ...(selectedFilter ? [selectedFilter] : []),
           )).orderBy(contacts.id)
           : await tx.select({ id: contacts.id, name: contacts.name, phoneE164: contacts.phoneE164, email: contacts.email, unsubscribeToken: contacts.unsubscribeToken }).from(contacts).where(and(
             eq(contacts.collectionId, collection.id), eq(contacts.status, "accepted"), eq(contacts.emailOptIn, true), isNotNull(contacts.email),
+            ...(selectedFilter ? [selectedFilter] : []),
           )).orderBy(contacts.id);
         const reviewRecipients = eligibleContacts.map(person => ({
           id: person.id,
@@ -481,27 +543,20 @@ export const cardoraRouter = router({
           subject: campaign.subject,
           message: campaign.message,
           recipientSnapshotHash: campaign.recipientSnapshotHash,
+          vcfDownloadTokenHash: campaign.vcfDownloadTokenHash,
         }) : "";
         if (!eligibleContacts.length || campaign.eligibleRecipientCount !== eligibleContacts.length || currentSnapshot !== campaign.recipientSnapshotHash || input.reviewHash !== expectedReview) {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The recipient set or message changed after review. No message was sent. Save a fresh draft, review the updated recipients and confirm again." });
         }
-        let gmailConnection: typeof gmailConnections.$inferSelect | null = null;
         if (campaign.channel === "sms") {
           const [profile] = await tx.select({ phoneE164: users.phoneE164, phoneCountryCode: users.phoneCountryCode, phoneVerifiedAt: users.phoneVerifiedAt }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
           if (!profile || !isKenyaSmsEligible(profile)) throw new TRPCError({ code: "FORBIDDEN", message: "SMS is available only to owners with a verified Kenyan (+254) number." });
           if (!process.env.NENA_API_KEY) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Nena SMS is not configured on this server." });
         } else {
-          if (!googleOAuthConfig().configured) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Gmail OAuth is not configured in this environment. Configure its credentials on the production VPS before sending." });
-          const [profile] = await tx.select({ notificationEmail: users.notificationEmail, email: users.email }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
-          const requiredEmail = profile?.notificationEmail ?? (profile?.email?.toLowerCase().endsWith("@gmail.com") ? profile.email : null);
-          const [connection] = await tx.select().from(gmailConnections).where(eq(gmailConnections.ownerId, ctx.user.id)).limit(1);
-          if (!requiredEmail || !connection || connection.gmailAddress.toLowerCase() !== requiredEmail.toLowerCase()) {
-            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Connect the same Gmail address saved in account settings before sending email." });
-          }
-          gmailConnection = connection;
+          if (!emailDeliveryConfigured()) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cardora email delivery is not configured. Check the verified Brevo sender settings." });
         }
         await tx.update(campaigns).set({ status: "sending", failureReason: null }).where(eq(campaigns.id, campaign.id));
-        return { campaign, collection, gmailConnection, recipients: eligibleContacts };
+        return { campaign, collection, recipients: eligibleContacts, downloadToken: input.downloadToken ?? null };
       });
       const recipients = reservation.recipients;
       if (!recipients.length) {
@@ -515,10 +570,13 @@ export const cardoraRouter = router({
       let failureReason: string | null = null;
       if (reservation.campaign.channel === "sms") {
         const numbers = recipients.map(person => person.phoneE164);
+        const message = reservation.downloadToken
+          ? `${reservation.campaign.message.trim()}\n\nDownload the shared VCF (available for 7 days): ${new URL(`/vcf/${reservation.downloadToken}`, reservation.collection.canonicalUrl).toString()}`
+          : reservation.campaign.message;
         for (let index = 0; index < numbers.length; index += 50) {
           const batch = numbers.slice(index, index + 50);
           try {
-            const result = await createNenaClient().send(batch, reservation.campaign.message);
+            const result = await createNenaClient().send(batch, message);
             queuedCount += result.accepted.length;
             skippedCount += Math.max(result.skippedCount, batch.length - result.accepted.length);
             if (result.providerMessageId) providerIds.push(result.providerMessageId);
@@ -530,38 +588,36 @@ export const cardoraRouter = router({
           }
         }
       } else {
-        try {
-          if (!reservation.gmailConnection) throw new GoogleIntegrationError("Gmail account connection is missing. Reconnect before sending.", "connection_missing");
-          const config = googleOAuthConfig();
-          const refreshToken = decryptRefreshToken(reservation.gmailConnection, config.encryptionKey);
-          const accessToken = await refreshGoogleAccessToken(refreshToken, config);
-          for (let index = 0; index < recipients.length; index += 5) {
-            const batch = recipients.slice(index, index + 5);
-            const outcomes = await Promise.allSettled(batch.map(async person => {
-              if (!person.email) throw new GoogleIntegrationError("An opted-in contact no longer has an email address.", "recipient_invalid");
-              const preferenceUrl = new URL(reservation.collection.canonicalUrl);
-              preferenceUrl.searchParams.set("unsubscribe", person.unsubscribeToken);
-              return sendGmailMessage(accessToken, person.email, reservation.campaign.subject, `${reservation.campaign.message.trim()}\n\n—\nManage your notification preferences: ${preferenceUrl.toString()}`);
-            }));
-            for (const outcome of outcomes) {
-              if (outcome.status === "fulfilled") { queuedCount += 1; providerIds.push(outcome.value.id); }
-              else if (!failureReason) failureReason = outcome.reason instanceof GoogleIntegrationError ? outcome.reason.message : "Gmail did not confirm this email. Review Gmail sent mail before retrying.";
-            }
-            await db.update(campaigns).set({ queuedRecipientCount: queuedCount, skippedRecipientCount: Math.max(0, recipients.length - queuedCount), providerMessageIds: providerIds.length ? JSON.stringify(providerIds) : null }).where(eq(campaigns.id, reservation.campaign.id));
-            if (failureReason) break;
+        const downloadUrl = reservation.downloadToken ? new URL(`/vcf/${reservation.downloadToken}`, reservation.collection.canonicalUrl).toString() : undefined;
+        for (let index = 0; index < recipients.length; index += 5) {
+          const batch = recipients.slice(index, index + 5);
+          const outcomes = await Promise.allSettled(batch.map(async person => {
+            if (!person.email) throw new Error("An opted-in contact no longer has an email address.");
+            const preferenceUrl = new URL(reservation.collection.canonicalUrl);
+            preferenceUrl.searchParams.set("unsubscribe", person.unsubscribeToken);
+            return sendBrevoCampaignEmail({
+              to: person.email,
+              subject: reservation.campaign.subject,
+              message: reservation.campaign.message,
+              preferenceUrl: preferenceUrl.toString(),
+              downloadUrl,
+            });
+          }));
+          for (const outcome of outcomes) {
+            if (outcome.status === "fulfilled") { queuedCount += 1; providerIds.push(outcome.value); }
+            else if (!failureReason) failureReason = outcome.reason instanceof Error ? outcome.reason.message : "Brevo did not confirm the email. Review the Brevo account before retrying.";
           }
-          skippedCount = Math.max(0, recipients.length - queuedCount);
-        } catch (error) {
-          failureReason = error instanceof GoogleIntegrationError ? error.message : "Gmail could not confirm the campaign outcome. Review Gmail sent mail before retrying.";
-          skippedCount = Math.max(0, recipients.length - queuedCount);
+          await db.update(campaigns).set({ queuedRecipientCount: queuedCount, skippedRecipientCount: Math.max(0, recipients.length - queuedCount), providerMessageIds: providerIds.length ? JSON.stringify(providerIds) : null }).where(eq(campaigns.id, reservation.campaign.id));
+          if (failureReason) break;
         }
+        skippedCount = Math.max(0, recipients.length - queuedCount);
       }
       const status = queuedCount === recipients.length ? "queued" : queuedCount > 0 ? "partial" : "failed";
       await db.update(campaigns).set({
         status, eligibleRecipientCount: recipients.length, queuedRecipientCount: queuedCount, skippedRecipientCount: skippedCount,
         providerMessageIds: providerIds.length ? JSON.stringify(providerIds) : null, failureReason, sentAt: queuedCount ? new Date() : null,
       }).where(eq(campaigns.id, reservation.campaign.id));
-      const providerLabel = reservation.campaign.channel === "sms" ? "Nena" : "Gmail";
+      const providerLabel = reservation.campaign.channel === "sms" ? "Nena" : "Brevo";
       return { campaignId: reservation.campaign.id, status, eligibleCount: recipients.length, queuedCount, skippedCount, message: status === "queued" ? `${providerLabel} accepted the campaign for ${queuedCount} opted-in contact${queuedCount === 1 ? "" : "s"}.` : status === "partial" ? `${providerLabel} accepted ${queuedCount} of ${recipients.length} eligible contacts. Review the result before taking further action.` : failureReason ?? `${providerLabel} did not confirm any queued recipients.` };
     }),
     unsubscribe: publicProcedure.input(z.object({ token: z.string().min(32).max(64) })).mutation(async ({ input }) => {
