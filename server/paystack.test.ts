@@ -25,13 +25,13 @@ describe("Paystack manual checkout", () => {
       .toEqual({ secretKey: "sk_live_private", appUrl: "https://cardora.example", callbackUrl: "https://cardora.example/billing/return" });
   });
 
-  it("initializes hosted one-time KES checkout with only card and mobile money channels", async () => {
+  it("initializes an inline KES card checkout with card as the only channel", async () => {
     const calls: Array<{ url: URL; init: RequestInit }> = [];
     const client = createPaystackClient(config, async (input, init) => {
       calls.push({ url: new URL(String(input)), init: init ?? {} });
       return response(200, { status: true, data: { reference: "CARDORA123", access_code: "access-code", authorization_url: "https://checkout.paystack.com/abc123" } });
     });
-    const checkout = await client.initializeTransaction({
+    const checkout = await client.initializeCardTransaction({
       email: "owner@example.com",
       amount: 129900,
       currency: "KES",
@@ -47,7 +47,7 @@ describe("Paystack manual checkout", () => {
       currency: "KES",
       reference: "CARDORA123",
       callback_url: config.callbackUrl,
-      channels: ["card", "mobile_money"],
+      channels: ["card"],
       metadata: JSON.stringify({ paymentId: 12, ownerId: 7, planId: 4 }),
     });
     expect(JSON.stringify(checkout)).not.toContain("sk_test_private");
@@ -61,8 +61,23 @@ describe("Paystack manual checkout", () => {
       status: true,
       data: { reference: "another-reference", access_code: "access-code", authorization_url: "https://checkout.paystack.com/abc" },
     }));
-    await expect(client.initializeTransaction({ email: "owner@example.com", amount: 1, currency: "KES", reference: "CARDORA123", callbackUrl: config.callbackUrl, metadata: "{}" }))
+    await expect(client.initializeCardTransaction({ email: "owner@example.com", amount: 1, currency: "KES", reference: "CARDORA123", callbackUrl: config.callbackUrl, metadata: "{}" }))
       .rejects.toThrow("Paystack could not complete the request");
+  });
+
+  it("sends M-Pesa STK directly through the charge API without opening card checkout", async () => {
+    const calls: Array<{ url: URL; init: RequestInit }> = [];
+    const client = createPaystackClient(config, async (input, init) => {
+      calls.push({ url: new URL(String(input)), init: init ?? {} });
+      return response(200, { status: true, data: { reference: "CARDORA123", status: "pay_offline", display_text: "Approve on your phone" } });
+    });
+    const result = await client.chargeMobileMoney({ email: "owner@example.com", amount: 129900, currency: "KES", reference: "CARDORA123", phone: "+254712345678" });
+    expect(calls[0].url.toString()).toBe("https://api.paystack.co/charge");
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({
+      email: "owner@example.com", amount: 129900, currency: "KES", reference: "CARDORA123",
+      mobile_money: { phone: "+254712345678", provider: "mpesa" },
+    });
+    expect(result.status).toBe("pay_offline");
   });
 
   it("verifies the exact raw HMAC-SHA512 webhook payload in constant-time comparison", () => {

@@ -12,6 +12,7 @@ import { canonicalNenaNumber, createNenaClient, NenaProviderError } from "./card
 import { createCodeChallenge, createCodeVerifier, createGoogleConsentUrl, decryptRefreshToken, digestOAuthState, GoogleIntegrationError, googleOAuthConfig, refreshGoogleAccessToken, sendGmailMessage } from "./cardoraGoogle";
 import { disconnectOwnerGmail, GMAIL_STATE_COOKIE } from "./cardoraOAuth";
 import { emailDeliveryConfigured, sendBrevoCampaignEmail } from "./emailVerification";
+import { subscriptionPaymentRouter } from "./subscriptionPaymentRouter";
 
 function requireDb() {
   return getDb().then(db => {
@@ -69,8 +70,9 @@ export const cardoraRouter = router({
         getOwnerEntitlement(db, ctx.user.id),
         listAvailablePlans(db),
       ]);
-      return { ...entitlement, availablePlans };
+      return { ...entitlement, availablePlans, mpesaAvailable: ctx.user.phoneCountryCode === "KE" };
     }),
+    payments: subscriptionPaymentRouter,
   }),
 
   collection: router({

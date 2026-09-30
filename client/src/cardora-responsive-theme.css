@@ -761,6 +761,21 @@
 .subscription-checkout-note svg { flex:0 0 auto; margin-top:1px; color:#718b68; }
 .subscription-checkout-note p { margin:0; font-size:9px; line-height:1.6; }
 .subscription-checkout-note strong { color:#445c48; }
+.subscription-pay-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; }
+.subscription-pay-actions button { min-height:31px; height:31px; gap:5px; padding:0 9px; font-size:9px; }
+.subscription-payment-pending { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:12px; padding:12px; border:1px solid #dfe7d8; border-radius:9px; background:#f6f9f2; color:#586957; }
+.subscription-payment-pending p { margin:4px 0; font-size:10px; }
+.subscription-payment-pending small { color:#858f82; font-size:8px; overflow-wrap:anywhere; }
+.subscription-payment-pending button { flex:0 0 auto; }
+.subscription-stk-dialog { gap:15px; }
+.subscription-stk-form { display:grid; gap:8px; }
+.subscription-stk-form>label { color:#566658; font-size:10px; font-weight:650; }
+.subscription-stk-form>input { min-height:39px; }
+.subscription-stk-form>small { color:#858f82; font-size:8px; }
+.subscription-stk-form [data-slot="dialog-footer"] { margin-top:8px; }
+.dark .subscription-payment-pending { background:#202e24; border-color:#405044; color:#d0dccb; }
+.dark .subscription-payment-pending small,.dark .subscription-stk-form>small { color:#aab8a6; }
+.dark .subscription-stk-form>label { color:#d0dccb; }
 .subscription-error { padding:15px; border:1px solid #e7d3c5; border-radius:10px; background:#fff8f3; color:#8f5b3d; font-size:11px; }
 
 .admin-subscription-page { display:grid; gap:14px; min-width:0; }

@@ -26,7 +26,7 @@ Cardora account login uses email/password with scrypt hashes and revocable datab
 
 - The seeded Free plan allows **100 accepted contacts across all of an owner's collections** and **5 retained collection links**. Each link keeps its own contact limit too. Lowering a plan preserves existing data and blocks further additions until usage is within the new limits.
 - Administrators can edit plan names, descriptions, contact/link quotas, prices and statuses, and can manually assign a plan to an owner in **Admin → Subscriptions**. Owners can review their current plan and usage in **Plan & usage**.
-- Paid self-service checkout is not enabled yet. The Paystack production flow is pending the final renewal-method choice and production-only server credentials/webhook setup. No payment is collected in Preview; never place a Paystack secret in browser code.
+- Paid self-service plans use Paystack: Kenyan customers can request an M-Pesa STK Push, and card payments open the inline card-only checkout on the plan page. Payments grant access for the selected monthly or yearly term and do not renew automatically. Paystack credentials are production server settings; never place the secret key in browser code. Payment status is confirmed server-side before plan access is granted.
 
 `server/_core/publicConfig.ts` exposes only named public runtime values. Private keys stay server-side. The platform serves managed `/manus-storage/` assets; the application does not register a second proxy.
 

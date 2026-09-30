@@ -28,7 +28,7 @@ export interface PaystackTransaction {
 }
 
 export interface PaystackClient {
-  initializeTransaction(input: {
+  initializeCardTransaction(input: {
     email: string;
     amount: number;
     currency: "KES";
@@ -36,6 +36,14 @@ export interface PaystackClient {
     callbackUrl: string;
     metadata: string;
   }): Promise<PaystackInitResult>;
+  chargeMobileMoney(input: {
+    email: string;
+    amount: number;
+    currency: "KES";
+    reference: string;
+    phone: string;
+  }): Promise<Pick<PaystackTransaction, "reference" | "status"> & Partial<Pick<PaystackTransaction, "amount" | "currency">> & { display_text?: string | null }>;
+  checkCharge(reference: string): Promise<PaystackTransaction>;
   verifyTransaction(reference: string): Promise<PaystackTransaction>;
 }
 
@@ -151,7 +159,7 @@ export function createPaystackClient(config: PaystackConfig, fetcher: typeof fet
   }
 
   return {
-    async initializeTransaction(input) {
+    async initializeCardTransaction(input) {
       const data = await request<{ authorization_url?: unknown; access_code?: unknown; reference?: unknown }>("/transaction/initialize", {
         method: "POST",
         body: JSON.stringify({
@@ -160,7 +168,7 @@ export function createPaystackClient(config: PaystackConfig, fetcher: typeof fet
           currency: input.currency,
           reference: input.reference,
           callback_url: input.callbackUrl,
-          channels: ["card", "mobile_money"],
+          channels: ["card"],
           metadata: input.metadata,
         }),
       });
@@ -169,6 +177,21 @@ export function createPaystackClient(config: PaystackConfig, fetcher: typeof fet
         throw new PaystackApiError();
       }
       return { authorizationUrl: data.authorization_url, accessCode: data.access_code, reference: data.reference };
+    },
+    async chargeMobileMoney(input) {
+      return request<Pick<PaystackTransaction, "reference" | "status"> & Partial<Pick<PaystackTransaction, "amount" | "currency">> & { display_text?: string | null }>("/charge", {
+        method: "POST",
+        body: JSON.stringify({
+          email: input.email,
+          amount: input.amount,
+          currency: input.currency,
+          reference: input.reference,
+          mobile_money: { phone: input.phone, provider: "mpesa" },
+        }),
+      });
+    },
+    async checkCharge(reference) {
+      return request<PaystackTransaction>(`/charge/${encodeURIComponent(reference)}`, { method: "GET" });
     },
     async verifyTransaction(reference) {
       const data = await request<PaystackTransaction>(`/transaction/verify/${encodeURIComponent(reference)}`, { method: "GET" });
