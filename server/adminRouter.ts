@@ -35,7 +35,7 @@ export const adminRouter = router({
       db.select({ countryCode: contacts.countryCode, total: count() }).from(contacts).where(eq(contacts.status, "accepted")).groupBy(contacts.countryCode),
       db.select({ status: campaigns.status, total: count() }).from(campaigns).groupBy(campaigns.status),
     ]);
-    const recentUsers = await db.select({ id: users.id, name: users.name, email: users.email, role: users.role, createdAt: users.createdAt, phoneCountryCode: users.phoneCountryCode, phoneVerifiedAt: users.phoneVerifiedAt })
+    const recentUsers = await db.select({ id: users.id, name: users.name, email: users.email, role: users.role, createdAt: users.createdAt, phoneCountryCode: users.phoneCountryCode, phoneVerifiedAt: users.phoneVerifiedAt, emailVerifiedAt: users.emailVerifiedAt })
       .from(users).orderBy(desc(users.createdAt)).limit(8);
     const recentCollections = await db.select({ id: collections.id, ownerId: collections.ownerId, slug: collections.slug, title: collections.title, allowedCountryCodes: collections.allowedCountryCodes, contactLimit: collections.contactLimit, usedSlots: collections.usedSlots, status: collections.status, createdAt: collections.createdAt })
       .from(collections).orderBy(desc(collections.createdAt)).limit(8);
@@ -62,7 +62,7 @@ export const adminRouter = router({
     const db = await requireDb();
     const term = input.search.trim();
     const filter = term ? or(like(users.name, `%${term}%`), like(users.email, `%${term}%`)) : undefined;
-    const rows = await db.select({ id: users.id, name: users.name, email: users.email, role: users.role, phoneCountryCode: users.phoneCountryCode, phoneVerifiedAt: users.phoneVerifiedAt, createdAt: users.createdAt, lastSignedIn: users.lastSignedIn })
+    const rows = await db.select({ id: users.id, name: users.name, email: users.email, role: users.role, phoneCountryCode: users.phoneCountryCode, phoneVerifiedAt: users.phoneVerifiedAt, emailVerifiedAt: users.emailVerifiedAt, createdAt: users.createdAt, lastSignedIn: users.lastSignedIn })
       .from(users).where(filter).orderBy(desc(users.createdAt)).limit(input.pageSize).offset(input.page * input.pageSize);
     const [total] = await db.select({ total: count() }).from(users).where(filter);
     return { rows, total: asNumber(total?.total), page: input.page, pageSize: input.pageSize };

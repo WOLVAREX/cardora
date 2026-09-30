@@ -9,6 +9,7 @@ import Home from "./pages/Home";
 import CollectionPage from "./pages/Collection";
 import PrivacyPage from "@/pages/Privacy";
 import AuthPage from "@/pages/Auth";
+import VerifyAccountPage from "@/pages/VerifyAccount";
 
 const AdminPage = lazy(() => import("./pages/Admin"));
 
@@ -19,6 +20,8 @@ function Router() {
       <Switch>
         <Route path={"/"} component={Home} />
         <Route path="/login" component={AuthPage} />
+        <Route path="/verify-account" component={VerifyAccountPage} />
+        <Route path="/verify-email" component={VerifyAccountPage} />
         <Route path="/c/:slug" component={CollectionPage} />
         <Route path="/admin" component={AdminPage} />
         <Route path="/privacy" component={PrivacyPage} />

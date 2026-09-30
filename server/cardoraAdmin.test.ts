@@ -17,6 +17,10 @@ describe("Cardora admin route protection", () => {
   });
 
   it("allows the explicit database administrator role", async () => {
-    await expect(caller({ id: 7, role: "admin" }).read()).resolves.toEqual({ id: 7, role: "admin" });
+    await expect(caller({ id: 7, role: "admin", phoneE164: "+254712345678", phoneCountryCode: "KE", phoneVerifiedAt: new Date() }).read()).resolves.toEqual({ id: 7, role: "admin" });
+  });
+
+  it("requires administrators to complete country-specific verification", async () => {
+    await expect(caller({ id: 7, role: "admin", phoneE164: "+254712345678", phoneCountryCode: "KE", phoneVerifiedAt: null }).read()).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });

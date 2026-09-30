@@ -27,15 +27,17 @@ export default function AuthPage() {
   const [mode, setMode] = useState<AuthMode>(() => new URLSearchParams(window.location.search).get("mode") === "signup" ? "signup" : "signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [formError, setFormError] = useState("");
   const utils = trpc.useUtils();
   const returnTo = useMemo(() => safeReturnPath(new URLSearchParams(window.location.search).get("returnTo")), []);
 
-  const completeLogin = (result: { id: number; name: string | null; email: string | null; role: "user" | "admin" }) => {
+  const completeLogin = (result: { id: number; name: string | null; email: string | null; role: "user" | "admin"; phoneE164: string | null; phoneCountryCode: string | null; phoneVerifiedAt: Date | null; emailVerifiedAt: Date | null }) => {
     utils.auth.me.setData(undefined, result);
     void utils.auth.me.invalidate();
-    navigate(returnTo);
+    const verified = result.phoneCountryCode === "KE" ? Boolean(result.phoneVerifiedAt) : Boolean(result.emailVerifiedAt);
+    navigate(result.phoneE164 && verified ? returnTo : "/verify-account");
   };
 
   const signIn = trpc.auth.signIn.useMutation({
@@ -49,7 +51,10 @@ export default function AuthPage() {
   const busy = signIn.isPending || signUp.isPending;
 
   useEffect(() => {
-    if (user) navigate(returnTo);
+    if (user) {
+      const verified = user.phoneCountryCode === "KE" ? Boolean(user.phoneVerifiedAt) : Boolean(user.emailVerifiedAt);
+      navigate(user.phoneE164 && verified ? returnTo : "/verify-account");
+    }
   }, [user, returnTo, navigate]);
 
   function switchMode(next: AuthMode) {
@@ -66,7 +71,7 @@ export default function AuthPage() {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError("");
-    if (mode === "signup") signUp.mutate({ name: name.trim(), email: email.trim(), password });
+    if (mode === "signup") signUp.mutate({ name: name.trim(), email: email.trim(), password, phone: phone.trim() });
     else signIn.mutate({ email: email.trim(), password });
   }
 
@@ -89,13 +94,14 @@ export default function AuthPage() {
 
         <form className="auth-form" onSubmit={submit}>
           {mode === "signup" && <div className="auth-field"><label htmlFor="auth-name">Your name</label><Input id="auth-name" name="name" autoComplete="name" required maxLength={120} value={name} onChange={event => setName(event.target.value)} placeholder="How should we address you?" /></div>}
+          {mode === "signup" && <div className="auth-field"><label htmlFor="auth-phone">Phone number</label><Input id="auth-phone" name="phone" type="tel" autoComplete="tel" required minLength={6} maxLength={40} value={phone} onChange={event => setPhone(event.target.value)} placeholder="+254 7xx xxx xxx" /><span className="auth-field-hint">Include your country calling code. Kenyan numbers verify by SMS; other countries verify by email.</span></div>}
           <div className="auth-field"><label htmlFor="auth-email">Email address</label><Input id="auth-email" name="email" type="email" autoComplete="email" required maxLength={320} value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" /></div>
           <div className="auth-field"><label htmlFor="auth-password">Password</label><Input id="auth-password" name="password" type="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} required minLength={mode === "signup" ? 12 : undefined} maxLength={1024} value={password} onChange={event => setPassword(event.target.value)} placeholder={mode === "signup" ? "At least 12 characters" : "Enter your password"} /><span className="auth-field-hint">{mode === "signup" ? "Use 12 or more characters." : ""}</span></div>
           {formError && <div className="auth-error" role="alert">{formError}</div>}
           <Button type="submit" className="primary-button auth-submit" disabled={busy || authLoading}>{busy ? "Please wait…" : mode === "signin" ? <>Sign in securely <ArrowRight size={16} /></> : <>Create your account <ArrowRight size={16} /></>}</Button>
         </form>
 
-        <div className="auth-security-note"><ShieldCheck size={16} /><p><strong>Your account stays yours.</strong> Passwords are hashed and sessions can be revoked. Cardora does not verify email in this flow.</p></div>
+        <div className="auth-security-note"><ShieldCheck size={16} /><p><strong>Your account stays yours.</strong> Passwords are hashed and sessions can be revoked. Phone is required; Kenyan accounts verify by SMS and all others verify by email.</p></div>
         {mode === "signup" && <p className="auth-legacy-note">Have a pre-existing Cardora account? Sign-up cannot claim or take it over by email. An operator must migrate legacy account access separately.</p>}
         {mode === "signin" && <p className="auth-legacy-note">Legacy accounts are available after the account owner completes the separate operator-run migration.</p>}
       </section>

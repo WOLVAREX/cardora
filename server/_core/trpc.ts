@@ -34,7 +34,18 @@ const requireUser = t.middleware(async opts => {
   });
 });
 
-export const protectedProcedure = baseProcedure.use(requireUser);
+export const onboardingProcedure = baseProcedure.use(requireUser);
+
+const requireVerifiedAccount = t.middleware(({ ctx, next }) => {
+  const user = ctx.user;
+  if (!user) throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+  const verified = user.phoneCountryCode === "KE" ? Boolean(user.phoneVerifiedAt) : Boolean(user.emailVerifiedAt);
+  if (!user.phoneE164 || !verified) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Complete account verification before using Cardora." });
+  }
+  return next();
+});
+export const protectedProcedure = onboardingProcedure.use(requireVerifiedAccount);
 
 export const adminProcedure = baseProcedure.use(
   t.middleware(async opts => {
@@ -43,6 +54,8 @@ export const adminProcedure = baseProcedure.use(
     if (!ctx.user || ctx.user.role !== 'admin') {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
+    const verified = ctx.user.phoneCountryCode === "KE" ? Boolean(ctx.user.phoneVerifiedAt) : Boolean(ctx.user.emailVerifiedAt);
+    if (!ctx.user.phoneE164 || !verified) throw new TRPCError({ code: "FORBIDDEN", message: "Complete account verification before using Cardora." });
 
     ctx.res.setHeader("Cache-Control", "private, no-store");
     return next({

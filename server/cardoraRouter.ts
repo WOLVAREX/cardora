@@ -7,7 +7,7 @@ import { buildVcf, campaignRecipientSnapshotHash, campaignReviewHash, CardoraVal
 import { createAccountLimitAlert, createCapacityAlert, listOwnerCollections, publicCollectionBySlug } from "./cardoraDb";
 import { getDb } from "./db";
 import { getOwnerEntitlement, listAvailablePlans } from "./subscriptionService";
-import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { onboardingProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { canonicalNenaNumber, createNenaClient, NenaProviderError } from "./cardoraNena";
 import { createCodeChallenge, createCodeVerifier, createGoogleConsentUrl, decryptRefreshToken, digestOAuthState, GoogleIntegrationError, googleOAuthConfig, refreshGoogleAccessToken, sendGmailMessage } from "./cardoraGoogle";
 import { disconnectOwnerGmail, GMAIL_STATE_COOKIE } from "./cardoraOAuth";
@@ -282,7 +282,7 @@ export const cardoraRouter = router({
   }),
 
   profile: router({
-    savePhone: protectedProcedure.input(z.object({ phone: z.string().min(6).max(40) })).mutation(async ({ ctx, input }) => {
+    savePhone: onboardingProcedure.input(z.object({ phone: z.string().min(6).max(40) })).mutation(async ({ ctx, input }) => {
       let normalized: ReturnType<typeof normalizePhone>;
       try { normalized = normalizePhone(input.phone); }
       catch (error) {
@@ -329,7 +329,7 @@ export const cardoraRouter = router({
       const disconnected = await disconnectOwnerGmail(ctx.user.id);
       return { disconnected, message: disconnected ? "Gmail has been disconnected from Cardora." : "No Gmail account is currently connected." };
     }),
-    requestPhoneVerification: protectedProcedure.mutation(async ({ ctx }) => {
+    requestPhoneVerification: onboardingProcedure.mutation(async ({ ctx }) => {
       const db = await requireDb();
       const [profile] = await db.select({ phoneE164: users.phoneE164, phoneCountryCode: users.phoneCountryCode, phoneVerifiedAt: users.phoneVerifiedAt })
         .from(users).where(eq(users.id, ctx.user.id)).limit(1);
@@ -362,7 +362,7 @@ export const cardoraRouter = router({
       }
       return { status: "code_sent" as const, message: `Verification code queued to ${profile.phoneE164}. Enter it within 10 minutes.` };
     }),
-    verifyPhoneCode: protectedProcedure.input(z.object({ code: z.string().regex(/^\d{6}$/, "Enter the six-digit code.") })).mutation(async ({ ctx, input }) => {
+    verifyPhoneCode: onboardingProcedure.input(z.object({ code: z.string().regex(/^\d{6}$/, "Enter the six-digit code.") })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const key = process.env.NENA_API_KEY;
       if (!key) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Phone verification is not available right now." });

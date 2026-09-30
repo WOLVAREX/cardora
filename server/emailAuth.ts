@@ -7,6 +7,7 @@ import { COOKIE_NAME, SESSION_LIFETIME_MS, AUTH_RATE_WINDOW_MS } from "@shared/c
 import { sessions, users, type User } from "../drizzle/schema";
 import { getDb } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { normalizePhone } from "./cardora";
 
 const SCRYPT_N = 16_384;
 const SCRYPT_R = 8;
@@ -107,8 +108,11 @@ function setSessionCookie(req: Request, res: Response, token: string, expiresAt:
   });
 }
 
-export async function signUpWithEmail(input: { name: string; email: string; password: string }, req: Request, res: Response): Promise<User> {
+export async function signUpWithEmail(input: { name: string; email: string; password: string; phone: string }, req: Request, res: Response): Promise<User> {
   const normalizedEmail = normalizeEmail(input.email);
+  let normalizedPhone: ReturnType<typeof normalizePhone>;
+  try { normalizedPhone = normalizePhone(input.phone); }
+  catch { throw new TRPCError({ code: "BAD_REQUEST", message: "Enter a valid international phone number, including its country calling code." }); }
   enforceAuthRateLimit(req, normalizedEmail, "signup");
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Cardora authentication is temporarily unavailable." });
@@ -129,8 +133,11 @@ export async function signUpWithEmail(input: { name: string; email: string; pass
       name: input.name.trim(),
       email: normalizedEmail,
       emailAuthEmail: normalizedEmail,
+      emailVerifiedAt: null,
       passwordHash,
       loginMethod: "email",
+      phoneE164: normalizedPhone.phoneE164,
+      phoneCountryCode: normalizedPhone.countryCode,
       role: "user",
       lastSignedIn: new Date(),
     }).returning({ id: users.id });

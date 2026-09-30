@@ -4,11 +4,17 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Brand, BrandMark } from "@/components/cardora/Brand";
 import { Dashboard } from "@/components/cardora/Dashboard";
 import { ThemeToggle } from "@/components/cardora/ThemeToggle";
+import { useEffect } from "react";
+import { useLocation } from "wouter";
 
 export default function Home() {
   const { user, loading, logout } = useAuth();
+  const [, navigate] = useLocation();
+  const verified = user && (user.phoneCountryCode === "KE" ? Boolean(user.phoneVerifiedAt) : Boolean(user.emailVerifiedAt));
+  useEffect(() => { if (user && (!user.phoneE164 || !verified)) navigate("/verify-account"); }, [user, verified, navigate]);
   if (loading) return <div className="auth-loading"><BrandMark size="lg" /><span>Opening your Cardora workspace…</span></div>;
-  if (user) return <Dashboard user={user} onLogout={() => void logout()} />;
+  if (user && user.phoneE164 && verified) return <Dashboard user={user} onLogout={() => void logout()} />;
+  if (user) return <div className="auth-loading"><BrandMark size="lg" /><span>Finishing account verification...</span></div>;
   return <Landing />;
 }
 

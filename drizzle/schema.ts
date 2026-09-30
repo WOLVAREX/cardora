@@ -28,6 +28,7 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 320 }),
   /** Normalized email reserved for Cardora password authentication. */
   emailAuthEmail: varchar("emailAuthEmail", { length: 320 }),
+  emailVerifiedAt: timestamp("emailVerifiedAt"),
   /** Scrypt hash; never returned by an API or stored in a browser. */
   passwordHash: varchar("passwordHash", { length: 255 }),
   notificationEmail: varchar("notificationEmail", { length: 320 }),
@@ -45,7 +46,7 @@ export const users = pgTable("users", {
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
-export type PublicUser = Pick<User, "id" | "name" | "email" | "role">;
+export type PublicUser = Pick<User, "id" | "name" | "email" | "role" | "phoneE164" | "phoneCountryCode" | "phoneVerifiedAt" | "emailVerifiedAt">;
 
 /** Opaque session tokens are stored only as digests and can be revoked server-side. */
 export const sessions = pgTable("cardora_sessions", {
@@ -210,6 +211,14 @@ export const phoneVerifications = pgTable("cardora_phone_verifications", {
   expiresAt: timestamp("expiresAt").notNull(),
   verifiedAt: timestamp("verifiedAt"),
 }, table => ({ ownerIndex: index("cardora_phone_verifications_owner_idx").on(table.ownerId, table.sentAt) }));
+
+export const emailVerifications = pgTable("cardora_email_verifications", {
+  id: serial("id").primaryKey(),
+  ownerId: integer("ownerId").notNull(),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => ({ tokenUnique: uniqueIndex("cardora_email_verifications_token_unique").on(table.tokenHash), ownerIndex: index("cardora_email_verifications_owner_idx").on(table.ownerId, table.createdAt) }));
 
 export const gmailConnections = pgTable("cardora_gmail_connections", {
   id: serial("id").primaryKey(),

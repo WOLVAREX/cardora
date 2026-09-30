@@ -9,6 +9,13 @@ React / Express / tRPC / Drizzle starter, adapted from the Sandbox web-db-user t
 
 Cardora account login uses email/password with scrypt hashes and revocable database sessions. Per-owner Gmail authorization remains a separate Google OAuth integration.
 
+## Account verification
+
+- Sign-up requires an international phone number. Kenyan numbers (`+254`) verify with an SMS one-time code; other countries verify the account email with a time-limited link. SMS campaign access remains limited to verified Kenyan numbers.
+- Configure `BREVO_API_KEY` and a verified sender in `BREVO_SENDER_EMAIL` to send email verification. Set `APP_URL` to the public site origin (for example `https://cardora.wolvarex.com`) so verification links return to the correct host. `CARDORA_PUBLIC_ORIGINS` can also provide the public origin.
+- Set those values in the local ignored `.env` and the production environment file. `.env.example` contains variable names and safe placeholders only. Without mail delivery configured, sign-up outside Kenya is disabled with a clear message.
+- Run `pnpm db:migrate` to add the email-verification timestamp and one-time token table before deploying this change.
+
 ## Authentication rollout
 
 - Cardora uses PostgreSQL. Apply migrations in `drizzle/postgres` with `pnpm db:migrate` before serving the application. The root-level SQL files are historical MySQL migrations and must not be applied to PostgreSQL.
