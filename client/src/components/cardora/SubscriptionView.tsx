@@ -14,7 +14,7 @@ function shortDate(value: Date | string | null) {
 export function SubscriptionView() {
   const query = trpc.cardora.subscription.status.useQuery();
   if (query.isLoading) return <div className="subscription-page"><div className="loading-row">Loading your plan and usage…</div></div>;
-  if (query.error || !query.data) return <div className="subscription-page"><div className="subscription-error">Your plan details could not be loaded. Refresh the page and try again.</div></div>;
+  if (query.error || !query.data) return <div className="subscription-page"><div className="subscription-error" role="alert">Your plan details could not be loaded. Try again in a moment.<button type="button" className="text-button" onClick={() => void query.refetch()} disabled={query.isFetching}>{query.isFetching ? "Retrying…" : "Try again"}</button></div></div>;
 
   const { plan, subscription, usage, availablePlans } = query.data;
   const contactPercent = Math.min(100, Math.round((usage.acceptedContacts / plan.contactLimit) * 100));

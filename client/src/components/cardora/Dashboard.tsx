@@ -84,7 +84,7 @@ export function Dashboard({ user, onLogout }: { user: PublicUser; onLogout: () =
     <div className="app-shell">
       <aside id="owner-navigation" className={`sidebar ${mobileMenuOpen ? "sidebar-open" : ""}`}>
         <a className="sidebar-brand" href="/"><Brand /></a>
-        <div className="sidebar-workspace"><span className="workspace-avatar">{(user.name || user.email || "C").slice(0, 1).toUpperCase()}</span><span><small>WORKSPACE</small><strong>{user.name || "My Cardora"}</strong></span><MoreHorizontal size={18} /></div>
+        <button type="button" className="sidebar-workspace sidebar-workspace-button" onClick={() => { setTab("settings"); setMobileMenuOpen(false); }} aria-label="Open account settings"><span className="workspace-avatar">{(user.name || user.email || "C").slice(0, 1).toUpperCase()}</span><span><small>WORKSPACE</small><strong>{user.name || "My Cardora"}</strong></span><MoreHorizontal size={18} aria-hidden="true" /></button>
         <nav className="side-nav" aria-label="Main navigation">
           <span className="nav-overline">WORKSPACE</span>
           {navItems.map(item => {
@@ -109,7 +109,7 @@ export function Dashboard({ user, onLogout }: { user: PublicUser; onLogout: () =
       {mobileMenuOpen && <button type="button" className="mobile-nav-backdrop" aria-label="Close navigation menu" onClick={() => setMobileMenuOpen(false)} />}
 
       <main className="main-area">
-        <header className="topbar"><div className="breadcrumbs"><span>Workspace</span><ChevronRight size={14} /><strong>{tab === "settings" ? "Account settings" : navItems.find(item => item.id === tab)?.label}</strong></div><div className="topbar-right"><span className="secure-note"><ShieldCheck size={15} /> Private by default</span><ThemeToggle /><button className="bell-button" aria-label="Notifications" onClick={() => { setTab("notifications"); setMobileMenuOpen(false); if (unreadAlerts) markRead.mutate(); }}><Bell size={18} />{unreadAlerts > 0 && <i />}</button><span className="topbar-avatar">{(user.name || user.email || "C").slice(0, 1).toUpperCase()}</span></div></header>
+        <header className="topbar"><div className="breadcrumbs"><span>Workspace</span><ChevronRight size={14} /><strong>{tab === "settings" ? "Account settings" : navItems.find(item => item.id === tab)?.label}</strong></div><div className="topbar-right"><span className="secure-note"><ShieldCheck size={15} /> Private by default</span><ThemeToggle /><button className="bell-button" aria-label="Notifications" onClick={() => { setTab("notifications"); setMobileMenuOpen(false); if (unreadAlerts) markRead.mutate(); }}><Bell size={18} />{unreadAlerts > 0 && <i />}</button><button type="button" className="topbar-profile-button" aria-label="Open account settings" title="Account settings" onClick={() => { setTab("settings"); setMobileMenuOpen(false); }}><span className="topbar-avatar">{(user.name || user.email || "C").slice(0, 1).toUpperCase()}</span></button></div></header>
 
         <div className="page-content">
           {data?.alerts.some(alert => !alert.readAt) && tab === "overview" && (() => { const alert = data.alerts.find(item => !item.readAt)!; return <button className="capacity-alert" onClick={() => { setTab("notifications"); markRead.mutate(); }}><span className="alert-dot" /><span><strong>{alert.kind === "account_limit_reached" ? "Your account has reached its contact limit" : "A collection has reached capacity"}</strong><small>{alert.message}</small></span><ChevronRight size={17} /></button>; })()}

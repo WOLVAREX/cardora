@@ -3,7 +3,7 @@ import { DEFAULT_FREE_PLAN, fromMinorUnits, getSubscriptionDisplayStatus, hasQuo
 
 describe("Cardora plan quotas", () => {
   it("defines the requested Free plan defaults", () => {
-    expect(DEFAULT_FREE_PLAN).toMatchObject({ contactLimit: 100, collectionLimit: 5, priceMinor: 0, currency: "KES" });
+    expect(DEFAULT_FREE_PLAN).toMatchObject({ contactLimit: 100, collectionLimit: 1, priceMinor: 0, currency: "KES" });
   });
 
   it("allows usage strictly below the cap and stops exactly at the cap", () => {

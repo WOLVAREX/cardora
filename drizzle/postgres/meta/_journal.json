@@ -15,6 +15,13 @@
       "when": 1790788080987,
       "tag": "0001_simple_ben_urich",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790789000000,
+      "tag": "0002_default_free_plan",
+      "breakpoints": true
     }
   ]
 }

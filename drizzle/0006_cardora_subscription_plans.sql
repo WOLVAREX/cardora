@@ -36,7 +36,7 @@ CREATE TABLE `cardora_subscription_plans` (
 	);
 	--> statement-breakpoint
 	INSERT IGNORE INTO `cardora_subscription_plans` (`code`, `name`, `description`, `contactLimit`, `collectionLimit`, `priceMinor`, `currency`, `billingInterval`, `isActive`, `isDefault`)
-	VALUES ('free', 'Free', 'The default Cardora plan: up to 100 accepted contacts and 5 collection links.', 100, 5, 0, 'KES', 'monthly', true, true);
+	VALUES ('free', 'Free', 'The default Cardora plan: up to 100 accepted contacts and 1 collection link.', 100, 1, 0, 'KES', 'monthly', true, true);
 	--> statement-breakpoint
 	CREATE INDEX `cardora_owner_subscriptions_plan_idx` ON `cardora_owner_subscriptions` (`planId`);--> statement-breakpoint
 CREATE INDEX `cardora_owner_subscriptions_paystack_idx` ON `cardora_owner_subscriptions` (`paystackSubscriptionCode`);--> statement-breakpoint

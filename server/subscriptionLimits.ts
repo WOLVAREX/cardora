@@ -1,9 +1,9 @@
 export const DEFAULT_FREE_PLAN = {
   code: "free",
   name: "Free",
-  description: "The default Cardora plan: up to 100 accepted contacts and 5 collection links.",
+  description: "The default Cardora plan: up to 100 accepted contacts and 1 collection link.",
   contactLimit: 100,
-  collectionLimit: 5,
+  collectionLimit: 1,
   priceMinor: 0,
   currency: "KES",
   billingInterval: "monthly" as const,
