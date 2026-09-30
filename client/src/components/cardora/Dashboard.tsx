@@ -13,6 +13,7 @@ import { trpc } from "@/lib/trpc";
 import type { PublicUser } from "../../../../drizzle/schema";
 import { safeShareUrl } from "@/lib/cardora";
 import type { CollectionList, DashboardData } from "@/lib/cardora-types";
+import { useLocation } from "wouter";
 
 type Tab = "overview" | "collections" | "contacts" | "notifications" | "subscription" | "settings";
 const navItems: Array<{ id: Tab; label: string; icon: typeof LayoutDashboard }> = [
@@ -22,9 +23,26 @@ const navItems: Array<{ id: Tab; label: string; icon: typeof LayoutDashboard }> 
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "subscription", label: "Plan & usage", icon: CreditCard },
 ];
+const tabPaths: Record<Tab, string> = {
+  overview: "/overview",
+  collections: "/collections",
+  contacts: "/contacts",
+  notifications: "/notifications",
+  subscription: "/plan-usage",
+  settings: "/account-settings",
+};
+function tabForPath(path: string): Tab {
+  const cleanPath = path.split("?")[0].replace(/\/$/, "") || "/";
+  return (Object.entries(tabPaths).find(([, route]) => route === cleanPath)?.[0] as Tab | undefined) ?? "overview";
+}
 
 export function Dashboard({ user, onLogout }: { user: PublicUser; onLogout: () => void }) {
-  const [tab, setTab] = useState<Tab>("overview");
+  const [location, setLocation] = useLocation();
+  const [tab, setTabState] = useState<Tab>(() => tabForPath(location));
+  const setTab = (next: Tab) => {
+    setTabState(next);
+    if (location !== tabPaths[next]) setLocation(tabPaths[next]);
+  };
   const [activeCollection, setActiveCollection] = useState<number | undefined>();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   useEffect(() => {
@@ -41,8 +59,6 @@ export function Dashboard({ user, onLogout }: { user: PublicUser; onLogout: () =
   const collections = data?.collections ?? [];
   const unreadAlerts = data?.alerts.filter(alert => !alert.readAt).length ?? 0;
 
-  const profileComplete = Boolean(data?.profile.notificationEmail && data?.profile.phoneE164);
-  const missingProfileFields = [!data?.profile.notificationEmail && "Gmail address", !data?.profile.phoneE164 && "phone number"].filter(Boolean) as string[];
   const allContacts = data?.totalContacts ?? 0;
   const openCollections = data?.openCollections ?? 0;
   useEffect(() => {
@@ -56,6 +72,8 @@ export function Dashboard({ user, onLogout }: { user: PublicUser; onLogout: () =
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
     if (status === "connected") void query.refetch();
   }, [query]);
+
+  useEffect(() => { setTabState(tabForPath(location)); }, [location]);
 
   function manageContacts(id: number) {
     setActiveCollection(id);
@@ -94,10 +112,9 @@ export function Dashboard({ user, onLogout }: { user: PublicUser; onLogout: () =
         <header className="topbar"><div className="breadcrumbs"><span>Workspace</span><ChevronRight size={14} /><strong>{tab === "settings" ? "Account settings" : navItems.find(item => item.id === tab)?.label}</strong></div><div className="topbar-right"><span className="secure-note"><ShieldCheck size={15} /> Private by default</span><ThemeToggle /><button className="bell-button" aria-label="Notifications" onClick={() => { setTab("notifications"); setMobileMenuOpen(false); if (unreadAlerts) markRead.mutate(); }}><Bell size={18} />{unreadAlerts > 0 && <i />}</button><span className="topbar-avatar">{(user.name || user.email || "C").slice(0, 1).toUpperCase()}</span></div></header>
 
         <div className="page-content">
-          {!query.isLoading && !profileComplete && tab !== "settings" && <div className="profile-nudge"><div className="nudge-icon"><Smartphone size={18} /></div><div><strong>Finish setting up your account</strong><p>Add your {missingProfileFields.join(" and ")} to start creating collection links.</p></div><Button variant="outline" onClick={() => setTab("settings")}>Add {missingProfileFields[0] ?? "details"} <ChevronRight size={15} /></Button></div>}
           {data?.alerts.some(alert => !alert.readAt) && tab === "overview" && (() => { const alert = data.alerts.find(item => !item.readAt)!; return <button className="capacity-alert" onClick={() => { setTab("notifications"); markRead.mutate(); }}><span className="alert-dot" /><span><strong>{alert.kind === "account_limit_reached" ? "Your account has reached its contact limit" : "A collection has reached capacity"}</strong><small>{alert.message}</small></span><ChevronRight size={17} /></button>; })()}
-          {tab === "overview" && <Overview data={data} loading={query.isLoading} onTab={setTab} onManage={manageContacts} profileComplete={profileComplete} />}
-          {tab === "collections" && <CollectionsPage collections={collections} onManage={manageContacts} profileComplete={profileComplete} remainingCollections={data?.subscription.usage.collectionsRemaining} onPlanClick={() => setTab("subscription")} />}
+          {tab === "overview" && <Overview data={data} loading={query.isLoading} email={user.email} onTab={setTab} onManage={manageContacts} />}
+          {tab === "collections" && <CollectionsPage collections={collections} onManage={manageContacts} remainingCollections={data?.subscription.usage.collectionsRemaining} onPlanClick={() => setTab("subscription")} />}
           {tab === "contacts" && <ContactsView collections={collections} initialCollectionId={activeCollection} smsEligible={data?.profile.smsEligible ?? false} />}
           {tab === "notifications" && <NotificationsView collections={collections} smsEligible={data?.profile.smsEligible ?? false} smsVisible={data?.profile.phoneCountryCode === "KE"} gmailConnected={data?.profile.gmailConnected ?? false} gmailConfigured={data?.profile.gmailConfigured ?? false} />}
           {tab === "subscription" && <SubscriptionView />}
@@ -109,12 +126,13 @@ export function Dashboard({ user, onLogout }: { user: PublicUser; onLogout: () =
   );
 }
 
-function Overview({ data, loading, onTab, onManage, profileComplete }: { data?: DashboardData; loading: boolean; onTab: (tab: Tab) => void; onManage: (id: number) => void; profileComplete: boolean }) {
+function Overview({ data, loading, email, onTab, onManage }: { data?: DashboardData; loading: boolean; email: string | null; onTab: (tab: Tab) => void; onManage: (id: number) => void }) {
   const collections = data?.collections ?? [];
   const latest = collections.slice(0, 4);
   return (
     <>
-      <div className="page-heading-row"><div><div className="eyebrow">YOUR CONTACTS, THOUGHTFULLY GATHERED</div><h1>Good connections, <em>kept close.</em></h1><p className="page-subtitle">Create a collection link, share it with your people, and bring everyone into one address book.</p></div><div className="heading-action">{profileComplete ? <CreateCollectionDialog onCreated={() => onTab("collections")} remainingCollections={data?.subscription.usage.collectionsRemaining} onPlanClick={() => onTab("subscription")} /> : <Button variant="outline" onClick={() => onTab("settings")}>Complete account setup <ChevronRight size={15} /></Button>}</div></div>
+      <div className="page-heading-row"><div><div className="eyebrow">YOUR CONTACTS, THOUGHTFULLY GATHERED</div><h1>Good connections, <em>kept close.</em></h1><p className="page-subtitle">Create a collection link, share it with your people, and bring everyone into one address book.</p></div><div className="heading-action"><CreateCollectionDialog onCreated={() => onTab("collections")} remainingCollections={data?.subscription.usage.collectionsRemaining} onPlanClick={() => onTab("subscription")} /></div></div>
+      {!loading && <section className="account-ready-banner"><span className="account-ready-icon"><BadgeCheck size={19} /></span><div><strong>Ready to go live</strong><p>Email: {data?.profile.notificationEmail ?? email ?? "Not saved"} <span>·</span> Phone: {data?.profile.phoneE164 ?? "Not saved"}. You can update these details in account settings.</p></div><Button variant="outline" onClick={() => onTab("settings")}>Manage details</Button></section>}
       <div className="stat-grid">
         <Metric icon={Users} label="Contacts collected" value={loading ? "—" : String(data?.totalContacts ?? 0)} helper="Across your collections" tone="sage" />
         <Metric icon={Link2} label="Active links" value={loading ? "—" : String(data?.openCollections ?? 0)} helper="Still accepting contacts" tone="green" />
@@ -122,11 +140,11 @@ function Overview({ data, loading, onTab, onManage, profileComplete }: { data?: 
       </div>
       <section className="content-card collection-card">
         <div className="section-head"><div><h2>Your collections</h2><p>Share a link. Build a little community.</p></div><button className="text-button" onClick={() => onTab("collections")}>View all <ChevronRight size={15} /></button></div>
-        {loading ? <div className="loading-row">Loading your collections…</div> : latest.length ? <CollectionRows collections={latest} onManage={onManage} /> : <div className="empty-collections"><div className="empty-art"><div className="empty-card empty-card-back" /><div className="empty-card empty-card-front"><span /><span /><span /></div><div className="empty-star">✳</div></div><div><h3>Your first collection starts here.</h3><p>Choose the countries you’ll accept, set a contact limit, then share your link.</p></div>{profileComplete ? <CreateCollectionDialog remainingCollections={data?.subscription.usage.collectionsRemaining} onPlanClick={() => onTab("subscription")} /> : <Button variant="outline" onClick={() => onTab("settings")}>Complete account setup</Button>}</div>}
+        {loading ? <div className="loading-row">Loading your collections…</div> : latest.length ? <CollectionRows collections={latest} onManage={onManage} /> : <div className="empty-collections"><div className="empty-art"><div className="empty-card empty-card-back" /><div className="empty-card empty-card-front"><span /><span /><span /></div><div className="empty-star">✳</div></div><div><h3>Your first collection starts here.</h3><p>Choose the countries you’ll accept, set a contact limit, then share your link.</p></div><CreateCollectionDialog remainingCollections={data?.subscription.usage.collectionsRemaining} onPlanClick={() => onTab("subscription")} /></div>}
       </section>
       <div className="bottom-grid">
         <section className="content-card getting-started"><div className="small-icon-circle"><Globe2 size={18} /></div><div><span className="eyebrow">HOW CARDORA WORKS</span><h2>From one link to a shared address book.</h2><p>Set your countries and contact cap. Cardora checks every number’s country calling code and closes the link when you reach your limit.</p><button className="text-button" onClick={() => onTab("collections")}>Explore collections <ChevronRight size={15} /></button></div></section>
-        <section className="integrations-card"><div className="integration-title"><span className="small-icon-circle"><Mail size={17} /></span><div><h3>Thoughtful notifications</h3><p>Reach people who chose to hear from you.</p></div></div><div className="integration-status"><span className={`status-dot ${data?.profile.gmailConnected ? "ready" : "muted"}`} />Gmail sender <b>{data?.profile.gmailConnected ? "Connected" : data?.profile.gmailConfigured ? "Connect Gmail" : "Production setup needed"}</b></div><div className="integration-status"><span className={`status-dot ${data?.profile.smsEligible ? "ready" : "muted"}`} />SMS eligibility <b>{data?.profile.smsEligible ? "Verified Kenyan owner" : data?.profile.phoneCountryCode === "KE" ? "Verify Kenyan phone" : "Kenya only"}</b></div><button className="text-button" onClick={() => onTab("notifications")}>Manage notifications <ChevronRight size={15} /></button></section>
+        <section className="integrations-card"><div className="integration-title"><span className="small-icon-circle"><Mail size={17} /></span><div><h3>Thoughtful notifications</h3><p>Reach people who chose to hear from you.</p></div></div><div className="integration-status"><span className={`status-dot ${data?.profile.gmailConnected ? "ready" : "muted"}`} />Gmail sender <b>{data?.profile.gmailConnected ? "Connected" : data?.profile.gmailConfigured ? "Ready to connect" : "Not configured yet"}</b></div><div className="integration-status"><span className={`status-dot ${data?.profile.smsEligible ? "ready" : "muted"}`} />SMS eligibility <b>{data?.profile.smsEligible ? "Verified Kenyan owner" : data?.profile.phoneCountryCode === "KE" ? "Verify Kenyan phone" : "Kenya only"}</b></div><button className="text-button" onClick={() => onTab("settings")}>Manage notification details <ChevronRight size={15} /></button></section>
       </div>
     </>
   );
@@ -136,8 +154,8 @@ function Metric({ icon: Icon, label, value, helper, tone }: { icon: typeof Users
   return <div className="metric-card"><div className={`metric-icon ${tone}`}><Icon size={18} strokeWidth={1.8} /></div><div className="metric-content"><span>{label}</span><strong>{value}</strong><small>{helper}</small></div><span className="metric-accent">↗</span></div>;
 }
 
-function CollectionsPage({ collections, onManage, profileComplete, remainingCollections, onPlanClick }: { collections: CollectionList; onManage: (id: number) => void; profileComplete: boolean; remainingCollections?: number; onPlanClick: () => void }) {
-  return <><div className="page-heading-row"><div><div className="eyebrow">YOUR LINK LIBRARY</div><h1>Collections</h1><p className="page-subtitle">Every shared link, in one tidy place.</p></div>{profileComplete && <CreateCollectionDialog remainingCollections={remainingCollections} onPlanClick={onPlanClick} />}</div><section className="content-card"><div className="section-head"><div><h2>{collections.length} {collections.length === 1 ? "collection" : "collections"}</h2><p>Capacity is a hard stop—once full, a link won’t take more contacts.</p></div></div>{collections.length ? <CollectionRows collections={collections} onManage={onManage} /> : <div className="empty-simple"><BookOpen size={25} /><h3>No collections yet</h3><p>Set up your Gmail and phone number, then create your first shareable link.</p></div>}</section></>;
+function CollectionsPage({ collections, onManage, remainingCollections, onPlanClick }: { collections: CollectionList; onManage: (id: number) => void; remainingCollections?: number; onPlanClick: () => void }) {
+  return <><div className="page-heading-row"><div><div className="eyebrow">YOUR LINK LIBRARY</div><h1>Collections</h1><p className="page-subtitle">Every shared link, in one tidy place.</p></div><CreateCollectionDialog remainingCollections={remainingCollections} onPlanClick={onPlanClick} /></div><section className="content-card"><div className="section-head"><div><h2>{collections.length} {collections.length === 1 ? "collection" : "collections"}</h2><p>Capacity is a hard stop—once full, a link won’t take more contacts.</p></div></div>{collections.length ? <CollectionRows collections={collections} onManage={onManage} /> : <div className="empty-simple"><BookOpen size={25} /><h3>No collections yet</h3><p>Create your first shareable link. Connect Gmail in account settings when you’re ready to send email notifications.</p></div>}</section></>;
 }
 
 function CollectionRows({ collections, onManage }: { collections: CollectionList; onManage: (id: number) => void }) {

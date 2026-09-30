@@ -132,6 +132,7 @@ export async function signUpWithEmail(input: { name: string; email: string; pass
       openId: null,
       name: input.name.trim(),
       email: normalizedEmail,
+      notificationEmail: normalizedEmail.endsWith("@gmail.com") ? normalizedEmail : null,
       emailAuthEmail: normalizedEmail,
       emailVerifiedAt: null,
       passwordHash,

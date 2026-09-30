@@ -97,9 +97,7 @@ export const cardoraRouter = router({
         throw error;
       }
       const db = await requireDb();
-      const [ownerProfile] = await db.select({ notificationEmail: users.notificationEmail, phoneE164: users.phoneE164 }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
-      const notificationEmail = ownerProfile?.notificationEmail ?? (ctx.user.email?.toLowerCase().endsWith("@gmail.com") ? ctx.user.email : null);
-      if (!notificationEmail) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Add a Gmail address in account settings before creating a collection." });
+      const [ownerProfile] = await db.select({ phoneE164: users.phoneE164 }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
       if (!ownerProfile?.phoneE164) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Add a phone number to your account before creating a collection." });
       try { normalizePhone(ownerProfile.phoneE164); }
       catch { throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Save a valid international phone number before creating a collection." }); }

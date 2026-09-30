@@ -19,6 +19,13 @@ function Router() {
     <Suspense fallback={<div className="auth-loading" role="status">Loading Cardora administration…</div>}>
       <Switch>
         <Route path={"/"} component={Home} />
+        <Route path="/overview" component={Home} />
+        <Route path="/collections" component={Home} />
+        <Route path="/contacts" component={Home} />
+        <Route path="/notifications" component={Home} />
+        <Route path="/plan-usage" component={Home} />
+        <Route path="/account-settings" component={Home} />
+        <Route path="/settings" component={Home} />
         <Route path="/login" component={AuthPage} />
         <Route path="/verify-account" component={VerifyAccountPage} />
         <Route path="/verify-email" component={VerifyAccountPage} />
