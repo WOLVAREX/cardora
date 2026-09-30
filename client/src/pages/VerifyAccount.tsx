@@ -63,9 +63,9 @@ export default function VerifyAccountPage() {
       <a className="auth-back-link" href="/login"><ArrowLeft size={14} /> Back to sign in</a>
       <section className="auth-card" aria-labelledby="verify-title">
         <div className="auth-card-mark"><BrandMark size="md" /></div>
-        <div className="eyebrow auth-eyebrow"><ShieldCheck size={13} /> ACCOUNT SETUP</div>
+        <div className="eyebrow auth-eyebrow"><ShieldCheck size={13} /> ACCOUNT VERIFICATION</div>
         <h1 id="verify-title">{verified ? <>You’re all<br /><em>set.</em></> : needsPhone ? <>Verify your<br /><em>phone.</em></> : <>Verify your<br /><em>email.</em></>}</h1>
-        <p className="auth-intro">{verified ? "Your account is verified. Taking you to Cardora…" : needsPhone ? "Kenyan accounts use SMS verification. Other phone numbers are required for account recovery; SMS features remain Kenya-only." : `We sent a secure verification link to ${user?.email ?? "your email address"}. Open it to finish setting up your account.`}</p>
+        <p className="auth-intro">{verified ? "Your account is verified. Taking you to Cardora…" : needsPhone ? "Kenyan accounts use SMS verification. Other phone numbers are required for account recovery; SMS features remain Kenya-only." : `We sent a secure verification link to ${user?.email ?? "your email address"}. Open it to verify your email and complete sign-up.`}</p>
         {!verified && needsPhone && <form className="auth-form" onSubmit={submitPhone}>
           {!user?.phoneE164 ? <div className="auth-field"><label htmlFor="verify-phone">Phone number</label><Input id="verify-phone" type="tel" autoComplete="tel" required minLength={6} maxLength={40} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+254 7xx xxx xxx" /><span className="auth-field-hint">Use international format, including your country calling code.</span></div> : <>
             <div className="auth-security-note"><MessageSquareText size={16} /><p><strong>Code sent to {user.phoneE164}.</strong> Enter the six-digit code from the SMS. You can request another if needed.</p></div>
