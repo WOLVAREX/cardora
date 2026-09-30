@@ -4,9 +4,14 @@ import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer,
 import { toast } from "sonner";
 import type { PublicUser } from "../../../../drizzle/schema";
 import { trpc } from "@/lib/trpc";
+import type { CardoraOutputs } from "@/lib/cardora-types";
 import { ThemeToggle } from "./ThemeToggle";
 import { flagForCountry } from "@/lib/cardora";
 import { SubscriptionManagementView } from "./SubscriptionManagementView";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+type AdminUserRow = CardoraOutputs["admin"]["users"]["rows"][number];
 
 type AdminTab = "overview" | "accounts" | "subscriptions" | "collections" | "campaigns";
 const tabs: Array<{ id: AdminTab; label: string; icon: typeof LayoutDashboard }> = [
@@ -38,6 +43,7 @@ export function AdminDashboard({ user, onLogout }: { user: PublicUser; onLogout:
   const collections = trpc.admin.collections.useQuery({ page, pageSize: 20, search }, { enabled: tab === "collections", retry: false });
   const campaigns = trpc.admin.campaigns.useQuery({ page, pageSize: 20, search }, { enabled: tab === "campaigns", retry: false });
   const nena = trpc.admin.nenaStatus.useQuery(undefined, { enabled: tab === "overview", retry: false, refetchOnWindowFocus: false });
+  const utils = trpc.useUtils();
   const metrics = overview.data?.metrics;
   const countryData = useMemo(() => (overview.data?.countries ?? []).slice(0, 8).map(row => ({ ...row, name: row.countryCode })), [overview.data?.countries]);
   const campaignData = useMemo(() => Object.entries(overview.data?.campaignStatus ?? {}).map(([status, total]) => ({ status: status.replaceAll("_", " "), total })), [overview.data?.campaignStatus]);
@@ -88,7 +94,7 @@ export function AdminDashboard({ user, onLogout }: { user: PublicUser; onLogout:
           <section className="admin-panel admin-table-card"><div className="admin-panel-head"><div><span className="admin-panel-icon"><Link2 size={16} /></span><div><h2>Recently created collections</h2><p>Country allow-lists and hard capacity at a glance</p></div></div><button className="admin-text-link" onClick={() => switchTab("collections")}>All collections <ChevronRight size={14} /></button></div><div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Collection</th><th>Owner</th><th>Countries</th><th>Capacity</th><th>Status</th></tr></thead><tbody>{(overview.data?.recentCollections ?? []).map(row => <tr key={row.id}><td><strong>{row.title}</strong><small>/{row.slug}</small></td><td>Owner #{row.ownerId}</td><td>{row.allowedCountryCodes.join(", ")}</td><td>{row.usedSlots} / {row.contactLimit}</td><td><span className={`admin-badge ${row.status}`}>{row.status}</span></td></tr>)}</tbody></table></div></section>
         </>}
 
-        {tab === "accounts" && <section className="admin-panel admin-table-card"><div className="admin-panel-head"><div><span className="admin-panel-icon"><Users size={16} /></span><div><h2>Owner directory</h2><p>{number(accounts.data?.total)} accounts · role, country and verification</p></div></div><input className="admin-search" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} placeholder="Search name/email" aria-label="Search accounts by name or email" /></div><div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Account</th><th>Role</th><th>Phone country</th><th>Email verified</th><th>Phone verified</th><th>Joined</th><th>Last sign-in</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}><td><strong>{row.name || `Account ${row.id}`}</strong><small>{row.email || `User #${row.id}`}</small></td><td><span className={`admin-badge ${row.role}`}>{row.role}</span></td><td>{row.phoneCountryCode ? `${flagForCountry(row.phoneCountryCode)} ${row.phoneCountryCode}` : "Not set"}</td><td>{row.emailVerifiedAt ? <span className="admin-verified"><BadgeCheck size={14} /> Verified</span> : "Not verified"}</td><td>{row.phoneVerifiedAt ? <span className="admin-verified"><BadgeCheck size={14} /> Verified</span> : "Not verified"}</td><td>{formatDate(row.createdAt)}</td><td>{formatDate(row.lastSignedIn)}</td></tr>)}</tbody></table></div>{!rows.length && !accounts.isLoading && <div className="admin-empty">No accounts match this search.</div>}<Pager page={page} total={accounts.data?.total} pageCount={pageCount} onChange={setPage} /></section>}
+        {tab === "accounts" && <section className="admin-panel admin-table-card"><div className="admin-panel-head"><div><span className="admin-panel-icon"><Users size={16} /></span><div><h2>Owner directory</h2><p>{number(accounts.data?.total)} accounts / role, country and verification</p></div></div><input className="admin-search" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} placeholder="Search name/email" aria-label="Search accounts by name or email" /></div><div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Account</th><th>Role</th><th>Phone country</th><th>Email verified</th><th>Phone verified</th><th>Joined</th><th>Last sign-in</th><th>Limits</th></tr></thead><tbody>{rows.map(row => <AccountDirectoryRow key={row.id} row={row} onSaved={async () => { await Promise.all([utils.admin.users.invalidate(), utils.admin.subscriptions.accounts.invalidate(), utils.cardora.dashboard.invalidate(), overview.refetch()]); }} />)}</tbody></table></div>{!rows.length && !accounts.isLoading && <div className="admin-empty">No accounts match this search.</div>}<Pager page={page} total={accounts.data?.total} pageCount={pageCount} onChange={setPage} /></section>}
 
         {tab === "collections" && <section className="admin-panel admin-table-card"><div className="admin-panel-head"><div><span className="admin-panel-icon"><Link2 size={16} /></span><div><h2>All collections</h2><p>{number(collections.data?.total)} share links · no contact-level records are shown</p></div></div></div><div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Collection</th><th>Owner</th><th>Allowed countries</th><th>Contacts</th><th>Capacity used</th><th>Status</th><th>Created</th></tr></thead><tbody>{(collections.data?.rows ?? []).map(row => <tr key={row.id}><td><strong>{row.title}</strong><small>/{row.slug}</small></td><td>{row.owner?.name || `Owner #${row.ownerId}`}<small>{row.owner?.email || ""}</small></td><td><div className="admin-country-tags">{row.allowedCountryCodes.slice(0, 5).map(code => <span key={code}>{code}</span>)}{row.allowedCountryCodes.length > 5 && <span>+{row.allowedCountryCodes.length - 5}</span>}</div></td><td>{number(row.activeContactCount)}</td><td><CapacityMeter used={row.usedSlots} limit={row.contactLimit} /></td><td><span className={`admin-badge ${row.status}`}>{row.status}</span></td><td>{formatDate(row.createdAt)}</td></tr>)}</tbody></table></div><Pager page={page} total={collections.data?.total} pageCount={pageCount} onChange={setPage} /></section>}
 
@@ -97,6 +103,46 @@ export function AdminDashboard({ user, onLogout }: { user: PublicUser; onLogout:
       </section>
     </main>
   </div>;
+}
+
+function AccountDirectoryRow({ row, onSaved }: { row: AdminUserRow; onSaved: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [contactLimit, setContactLimit] = useState(row.limits.contactLimit?.toString() ?? "");
+  const [collectionLimit, setCollectionLimit] = useState(row.limits.collectionLimit?.toString() ?? "");
+  const [maxContactsPerCollection, setMaxContactsPerCollection] = useState(row.limits.maxContactsPerCollection?.toString() ?? "");
+  const [applyToExisting, setApplyToExisting] = useState(false);
+  const save = trpc.admin.setUserLimits.useMutation({
+    onSuccess: async () => { toast.success(`Limits updated for ${row.name || row.email || `account ${row.id}`}.`); setOpen(false); setApplyToExisting(false); await onSaved(); },
+    onError: error => toast.error(error.message),
+  });
+  useEffect(() => {
+    setContactLimit(row.limits.contactLimit?.toString() ?? "");
+    setCollectionLimit(row.limits.collectionLimit?.toString() ?? "");
+    setMaxContactsPerCollection(row.limits.maxContactsPerCollection?.toString() ?? "");
+  }, [row.limits.contactLimit, row.limits.collectionLimit, row.limits.maxContactsPerCollection]);
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const optionalLimit = (value: string) => value.trim() ? Number(value) : null;
+    save.mutate({
+      ownerId: row.id,
+      contactLimit: optionalLimit(contactLimit),
+      collectionLimit: optionalLimit(collectionLimit),
+      maxContactsPerCollection: optionalLimit(maxContactsPerCollection),
+      applyPerCollectionLimitToExisting: applyToExisting,
+    });
+  }
+  const hasCustomLimits = row.limits.contactLimit !== null || row.limits.collectionLimit !== null || row.limits.maxContactsPerCollection !== null;
+  return <>
+    <tr><td><strong>{row.name || `Account ${row.id}`}</strong><small>{row.email || `User #${row.id}`}</small></td><td><span className={`admin-badge ${row.role}`}>{row.role}</span></td><td>{row.phoneCountryCode ? `${flagForCountry(row.phoneCountryCode)} ${row.phoneCountryCode}` : "Not set"}</td><td>{row.emailVerifiedAt ? <span className="admin-verified"><BadgeCheck size={14} /> Verified</span> : "Not verified"}</td><td>{row.phoneVerifiedAt ? <span className="admin-verified"><BadgeCheck size={14} /> Verified</span> : "Not verified"}</td><td>{formatDate(row.createdAt)}</td><td>{formatDate(row.lastSignedIn)}</td><td className="admin-user-limit-cell"><small>{hasCustomLimits ? "Custom limits" : "Plan defaults"}</small><Button type="button" variant="outline" onClick={() => setOpen(true)}>Set limits</Button></td></tr>
+    <Dialog open={open} onOpenChange={setOpen}><DialogContent className="admin-user-limits-dialog"><DialogHeader><DialogTitle>Limits for {row.name || `Account ${row.id}`}</DialogTitle><DialogDescription>Leave a field blank to use the user’s assigned plan or the platform maximum. Account limits govern total usage; per-link limits govern each link separately.</DialogDescription></DialogHeader><form onSubmit={submit} className="admin-user-limit-form">
+      <label className="admin-user-limit-field"><span>Maximum accepted contacts across all links</span><input type="number" min={1} max={1000000} step={1} value={contactLimit} onChange={event => setContactLimit(event.target.value)} placeholder="Use assigned plan" /><small>Increasing this lets the account accept more contacts in total.</small></label>
+      <label className="admin-user-limit-field"><span>Maximum number of collection links</span><input type="number" min={1} max={10000} step={1} value={collectionLimit} onChange={event => setCollectionLimit(event.target.value)} placeholder="Use assigned plan" /><small>Links already created stay in the account when you change this.</small></label>
+      <label className="admin-user-limit-field"><span>Maximum contacts per collection link</span><input type="number" min={1} max={100000} step={1} value={maxContactsPerCollection} onChange={event => { setMaxContactsPerCollection(event.target.value); if (!event.target.value) setApplyToExisting(false); }} placeholder="Platform maximum: 100,000" /><small>This cap applies to new links. The account owner chooses a limit up to this value.</small></label>
+      <label className="admin-user-limit-check"><input type="checkbox" checked={applyToExisting} disabled={!maxContactsPerCollection.trim()} onChange={event => setApplyToExisting(event.target.checked)} /><span>Set this contact limit on all current links too</span></label>
+      {applyToExisting && <p className="admin-user-limit-warning">Current links with more used spots than this value will prevent saving. Paused links stay paused; other links reopen or close based on their new limit.</p>}
+      <DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" className="primary-button" disabled={save.isPending}>{save.isPending ? "Saving…" : "Save limits"}</Button></DialogFooter>
+    </form></DialogContent></Dialog>
+  </>;
 }
 
 function AdminMetric({ icon: Icon, label, value, helper, tone }: { icon: typeof Users; label: string; value?: number | string; helper: string; tone: string }) {

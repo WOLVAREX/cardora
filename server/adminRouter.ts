@@ -1,7 +1,7 @@
 import { and, count, desc, eq, gte, inArray, like, or, sum } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { campaigns, collections, contacts, users } from "../drizzle/schema";
+import { campaigns, collections, contacts, ownerQuotaOverrides, users } from "../drizzle/schema";
 import { adminProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { createNenaClient } from "./cardoraNena";
@@ -65,7 +65,59 @@ export const adminRouter = router({
     const rows = await db.select({ id: users.id, name: users.name, email: users.email, role: users.role, phoneCountryCode: users.phoneCountryCode, phoneVerifiedAt: users.phoneVerifiedAt, emailVerifiedAt: users.emailVerifiedAt, createdAt: users.createdAt, lastSignedIn: users.lastSignedIn })
       .from(users).where(filter).orderBy(desc(users.createdAt)).limit(input.pageSize).offset(input.page * input.pageSize);
     const [total] = await db.select({ total: count() }).from(users).where(filter);
-    return { rows, total: asNumber(total?.total), page: input.page, pageSize: input.pageSize };
+    const ids = rows.map(row => row.id);
+    const overrides = ids.length ? await db.select().from(ownerQuotaOverrides).where(inArray(ownerQuotaOverrides.ownerId, ids)) : [];
+    const overrideMap = new Map(overrides.map(row => [row.ownerId, row]));
+    return {
+      rows: rows.map(row => {
+        const limits = overrideMap.get(row.id);
+        return { ...row, limits: { contactLimit: limits?.contactLimit ?? null, collectionLimit: limits?.collectionLimit ?? null, maxContactsPerCollection: limits?.maxContactsPerCollection ?? null } };
+      }),
+      total: asNumber(total?.total), page: input.page, pageSize: input.pageSize,
+    };
+  }),
+
+  setUserLimits: adminProcedure.input(z.object({
+    ownerId: z.number().int().positive(),
+    contactLimit: z.number().int().min(1).max(1_000_000).nullable(),
+    collectionLimit: z.number().int().min(1).max(10_000).nullable(),
+    maxContactsPerCollection: z.number().int().min(1).max(100_000).nullable(),
+    applyPerCollectionLimitToExisting: z.boolean().default(false),
+  })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    await db.transaction(async tx => {
+      const [owner] = await tx.select({ id: users.id }).from(users).where(eq(users.id, input.ownerId)).limit(1).for("update");
+      if (!owner) throw new TRPCError({ code: "NOT_FOUND", message: "Owner account not found." });
+      if (input.applyPerCollectionLimitToExisting) {
+        if (input.maxContactsPerCollection === null) throw new TRPCError({ code: "BAD_REQUEST", message: "Set a maximum contacts per collection before applying it to existing links." });
+        const existingCollections = await tx.select({ id: collections.id, title: collections.title, usedSlots: collections.usedSlots, status: collections.status })
+          .from(collections).where(eq(collections.ownerId, input.ownerId)).for("update");
+        const overfull = existingCollections.find(collection => collection.usedSlots > input.maxContactsPerCollection!);
+        if (overfull) throw new TRPCError({ code: "PRECONDITION_FAILED", message: `“${overfull.title}” already has ${overfull.usedSlots} used spots. Its limit cannot be lowered below that number.` });
+        for (const collection of existingCollections) {
+          await tx.update(collections).set({
+            contactLimit: input.maxContactsPerCollection,
+            ...(collection.status === "paused" ? {} : { status: collection.usedSlots >= input.maxContactsPerCollection ? "full" as const : "open" as const }),
+          }).where(eq(collections.id, collection.id));
+        }
+      }
+      const values = {
+        contactLimit: input.contactLimit,
+        collectionLimit: input.collectionLimit,
+        maxContactsPerCollection: input.maxContactsPerCollection,
+        updatedBy: ctx.user.id,
+      };
+      const [existing] = await tx.select({ id: ownerQuotaOverrides.id }).from(ownerQuotaOverrides)
+        .where(eq(ownerQuotaOverrides.ownerId, input.ownerId)).limit(1).for("update");
+      if (input.contactLimit === null && input.collectionLimit === null && input.maxContactsPerCollection === null) {
+        if (existing) await tx.delete(ownerQuotaOverrides).where(eq(ownerQuotaOverrides.ownerId, input.ownerId));
+      } else if (existing) {
+        await tx.update(ownerQuotaOverrides).set(values).where(eq(ownerQuotaOverrides.ownerId, input.ownerId));
+      } else {
+        await tx.insert(ownerQuotaOverrides).values({ ownerId: input.ownerId, ...values });
+      }
+    });
+    return { success: true } as const;
   }),
 
   collections: adminProcedure.input(searchPageInput).query(async ({ input }) => {

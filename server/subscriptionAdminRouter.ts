@@ -1,7 +1,7 @@
 import { and, count, desc, eq, inArray, like, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { collections, contacts, ownerSubscriptions, subscriptionPlans, users } from "../drizzle/schema";
+import { collections, contacts, ownerQuotaOverrides, ownerSubscriptions, subscriptionPlans, users } from "../drizzle/schema";
 import { adminProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { getSubscriptionDisplayStatus, isActivePaystackAssignment, isSubscriptionPeriodCurrent, toMinorUnits } from "./subscriptionLimits";
@@ -146,7 +146,7 @@ export const subscriptionAdminRouter = router({
     const ids = rows.map(row => row.id);
     if (!ids.length) return { rows: [], total: Number(totalRows[0]?.total ?? 0), page: input.page, pageSize: input.pageSize };
 
-    const [assignments, collectionCounts, contactCounts] = await Promise.all([
+    const [assignments, collectionCounts, contactCounts, quotaOverrides] = await Promise.all([
       db.select({ assignment: ownerSubscriptions, plan: subscriptionPlans }).from(ownerSubscriptions)
         .innerJoin(subscriptionPlans, eq(ownerSubscriptions.planId, subscriptionPlans.id))
         .where(inArray(ownerSubscriptions.ownerId, ids)),
@@ -155,23 +155,26 @@ export const subscriptionAdminRouter = router({
       db.select({ ownerId: collections.ownerId, total: count() }).from(contacts)
         .innerJoin(collections, eq(contacts.collectionId, collections.id))
         .where(and(inArray(collections.ownerId, ids), eq(contacts.status, "accepted"))).groupBy(collections.ownerId),
+      db.select().from(ownerQuotaOverrides).where(inArray(ownerQuotaOverrides.ownerId, ids)),
     ]);
     const assignmentMap = new Map(assignments.map(row => [row.assignment.ownerId, row]));
     const collectionMap = new Map(collectionCounts.map(row => [row.ownerId, Number(row.total ?? 0)]));
     const contactMap = new Map(contactCounts.map(row => [row.ownerId, Number(row.total ?? 0)]));
+    const quotaMap = new Map(quotaOverrides.map(row => [row.ownerId, row]));
     const now = new Date();
     return {
       rows: rows.map(row => {
         const record = assignmentMap.get(row.id);
         const isCurrent = Boolean(record && record.plan.isActive && isSubscriptionPeriodCurrent({ status: record.assignment.status, currentPeriodEnd: record.assignment.currentPeriodEnd }, now));
         const effectivePlan = isCurrent ? record!.plan : defaultPlan;
+        const quota = quotaMap.get(row.id);
         const status = getSubscriptionDisplayStatus(record?.assignment ?? null, now);
         return {
           id: row.id,
           name: row.name,
           email: row.emailAuthEmail ?? row.email,
           role: row.role,
-          plan: { id: effectivePlan.id, code: effectivePlan.code, name: effectivePlan.name, contactLimit: effectivePlan.contactLimit, collectionLimit: effectivePlan.collectionLimit },
+          plan: { id: effectivePlan.id, code: effectivePlan.code, name: effectivePlan.name, contactLimit: quota?.contactLimit ?? effectivePlan.contactLimit, collectionLimit: quota?.collectionLimit ?? effectivePlan.collectionLimit },
           subscription: {
             status,
             source: record?.assignment.source ?? "default" as const,

@@ -1,5 +1,5 @@
 import { and, count, eq } from "drizzle-orm";
-import { contacts, collections, ownerSubscriptions, subscriptionPlans, type SubscriptionPlan } from "../drizzle/schema";
+import { contacts, collections, ownerQuotaOverrides, ownerSubscriptions, subscriptionPlans, type SubscriptionPlan } from "../drizzle/schema";
 import { getSubscriptionDisplayStatus, hasQuotaCapacity, isSubscriptionPeriodCurrent, remainingQuota } from "./subscriptionLimits";
 
 export type SafePlan = Pick<SubscriptionPlan,
@@ -8,6 +8,7 @@ export type SafePlan = Pick<SubscriptionPlan,
 
 export interface OwnerEntitlement {
   plan: SafePlan;
+  maxContactsPerCollection: number;
   subscription: {
     status: "free" | "active" | "past_due" | "canceled" | "expired";
     source: "default" | "admin" | "paystack";
@@ -35,12 +36,18 @@ export async function getOwnerEntitlement(db: any, ownerId: number, now = new Da
     .innerJoin(subscriptionPlans, eq(ownerSubscriptions.planId, subscriptionPlans.id))
     .where(eq(ownerSubscriptions.ownerId, ownerId))
     .limit(1);
+  const [quotaOverride] = await db.select().from(ownerQuotaOverrides).where(eq(ownerQuotaOverrides.ownerId, ownerId)).limit(1);
 
   const assignmentIsCurrent = Boolean(row && row.plan.isActive && isSubscriptionPeriodCurrent({
     status: row.assignment.status,
     currentPeriodEnd: row.assignment.currentPeriodEnd,
   }, now));
-  const plan = assignmentIsCurrent ? row!.plan : defaultPlan;
+  const sourcePlan = assignmentIsCurrent ? row!.plan : defaultPlan;
+  const plan = {
+    ...sourcePlan,
+    contactLimit: quotaOverride?.contactLimit ?? sourcePlan.contactLimit,
+    collectionLimit: quotaOverride?.collectionLimit ?? sourcePlan.collectionLimit,
+  };
   const [collectionCount] = await db.select({ total: count() }).from(collections).where(eq(collections.ownerId, ownerId));
   const [contactCount] = await db.select({ total: count() }).from(contacts)
     .innerJoin(collections, eq(contacts.collectionId, collections.id))
@@ -48,6 +55,7 @@ export async function getOwnerEntitlement(db: any, ownerId: number, now = new Da
   const collectionsUsed = Number(collectionCount?.total ?? 0);
   const contactsUsed = Number(contactCount?.total ?? 0);
   return {
+    maxContactsPerCollection: quotaOverride?.maxContactsPerCollection ?? 100_000,
     plan: {
       id: plan.id,
       code: plan.code,

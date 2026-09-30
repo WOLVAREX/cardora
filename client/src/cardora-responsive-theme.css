@@ -129,6 +129,25 @@
 .dark .admin-table th { color:#9fad9e!important; }
 .dark .admin-badge { background:#25342a!important; color:#c8d8be!important; }
 .dark .admin-empty { color:#aab6a8!important; }
+.dark .account-ready-banner { background:#1d2c21!important; border-color:#3b513d!important; }
+.dark .account-ready-icon { background:#2a3b2d!important; color:#c7d8b8!important; }
+.dark .account-ready-banner strong { color:#dce8d8!important; }
+.dark .account-ready-banner p { color:#afbdab!important; }
+.dark .account-ready-banner button { border-color:#516652!important; color:#dce8d8!important; }
+.dark .account-ready-banner button:hover { background:#26372b!important; }
+.dark .integrations-card { background:#18231c!important; border-color:#344239!important; }
+.dark .integration-title h3,.dark .getting-started h2 { color:#e0eadc!important; }
+.dark .integration-title p,.dark .getting-started p { color:#a8b5a4!important; }
+.dark .integration-status { color:#bdcbb9!important; }
+.dark .integration-status b { color:#d1ddcc!important; }
+.dark .country-code-cell { background:#29382d!important; color:#d0ddc7!important; }
+.dark .channel-prefs>span { background:#293a2e!important; color:#c6d8b8!important; }
+.dark .channel-prefs .no-updates { background:#29322c!important; color:#aeb8aa!important; }
+.dark .contact-name i { background:#2c3b30!important; color:#c7d7b9!important; }
+.dark .empty-card { border-color:#3d4c3e!important; background:#25342a!important; }
+.dark .empty-card-front { background:#1b2920!important; }
+.dark .empty-card-front span { background:#354538!important; }
+.dark .empty-card-front span:first-child { background:#91aa7d!important; }
 @media (max-width:640px) { .dark .mobile-menu-toggle { color:#dce9d9; } }
 
 /* Platform administration and privacy surfaces */
@@ -790,6 +809,17 @@
 .admin-subscription-table td>small { display:block; margin-top:3px; color:#969c92; font-size:7px; }
 .admin-subscription-table .quota-exhausted { color:#aa6948; font-weight:700; }
 .admin-assign-button { min-height:29px; height:29px; gap:4px; padding:0 8px; font-size:8px; }
+.admin-user-limit-cell { min-width:145px; }
+.admin-user-limit-cell>small { display:block; margin-bottom:5px; color:#8b9387; font-size:8px; }
+.admin-user-limit-cell button { min-height:28px; padding:0 9px; font-size:8px; }
+.admin-user-limits-dialog { max-height:min(90vh,760px); overflow-y:auto; }
+.admin-user-limit-form { display:grid; gap:12px; }
+.admin-user-limit-field { display:grid; gap:5px; color:#536354; font-size:10px; font-weight:650; }
+.admin-user-limit-field input { width:100%; min-height:37px; padding:8px 10px; border:1px solid #dfe4d9; border-radius:7px; background:#fffefa; color:#3d4b3e; font:inherit; }
+.admin-user-limit-field small { color:#8b9387; font-size:8px; font-weight:400; line-height:1.5; }
+.admin-user-limit-check { display:flex; align-items:flex-start; gap:8px; color:#5d6f5e; font-size:9px; }
+.admin-user-limit-check input { margin-top:1px; accent-color:#718b51; }
+.admin-user-limit-warning { margin:0; padding:9px; border:1px solid #ebdac6; border-radius:7px; background:#fbf5ed; color:#8f6b49; font-size:8px; line-height:1.5; }
 
 .dark .subscription-current-title h2,.dark .subscription-usage-heading>div>strong,.dark .subscription-current-meta strong,.dark .subscription-option-head h3,.dark .subscription-option-price { color:#e2ebdf; }
 .dark .subscription-current-title p,.dark .subscription-current-meta,.dark .subscription-usage-heading>div>span,.dark .subscription-usage-card>p,.dark .subscription-option>p { color:#a4b0a2; }
@@ -815,6 +845,11 @@
 .dark .admin-plan-field { color:#c5d2c2; }
 .dark .admin-plan-field input,.dark .admin-plan-field select,.dark .admin-plan-field textarea,.dark .admin-plan-search,.dark .admin-assignment-inputs select,.dark .admin-date-input { background:#111b15; border-color:#405044; color:#edf2eb; }
 .dark .admin-plan-search input { background:transparent; color:#edf2eb; }
+.dark .admin-user-limit-cell>small { color:#afbcaa; }
+.dark .admin-user-limit-field { color:#d0dccb; }
+.dark .admin-user-limit-field input { background:#111b15; border-color:#405044; color:#edf2eb; }
+.dark .admin-user-limit-field small,.dark .admin-user-limit-check { color:#aab8a6; }
+.dark .admin-user-limit-warning { background:#332921; border-color:#59402e; color:#e3b18c; }
 .dark .admin-plan-flags label { color:#bac7b6; }
 .dark .admin-subscription-table .quota-exhausted { color:#e0a57e; }
 

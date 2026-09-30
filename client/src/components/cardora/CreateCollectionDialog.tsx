@@ -9,7 +9,7 @@ import { CountryPicker } from "./CountryPicker";
 import { BrandMark } from "./Brand";
 import { trpc } from "@/lib/trpc";
 
-export function CreateCollectionDialog({ onCreated, remainingCollections, onPlanClick }: { onCreated?: () => void; remainingCollections?: number; onPlanClick?: () => void }) {
+export function CreateCollectionDialog({ onCreated, remainingCollections, maxContactLimit = 100000, onPlanClick }: { onCreated?: () => void; remainingCollections?: number; maxContactLimit?: number; onPlanClick?: () => void }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("New contact list");
   const [description, setDescription] = useState("A simple way to collect and keep everyone’s contact details together.");
@@ -24,6 +24,9 @@ export function CreateCollectionDialog({ onCreated, remainingCollections, onPlan
   useEffect(() => {
     if (open && !customUrl && typeof window !== "undefined") setCanonicalUrl(`${window.location.origin}/c/${slug}`);
   }, [open, slug, customUrl]);
+  useEffect(() => {
+    if (Number(limit) > maxContactLimit) setLimit(String(maxContactLimit));
+  }, [limit, maxContactLimit]);
 
   const create = trpc.cardora.collection.create.useMutation({
     onSuccess: async () => {
@@ -43,7 +46,7 @@ export function CreateCollectionDialog({ onCreated, remainingCollections, onPlan
     event.preventDefault();
     if (!countries.length) { toast.error("Select at least one allowed country."); return; }
     const parsedLimit = Number(limit);
-    if (!Number.isInteger(parsedLimit) || parsedLimit < 1) { toast.error("Set a contact limit of at least one."); return; }
+    if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > maxContactLimit) { toast.error(`Set a contact limit between 1 and ${maxContactLimit.toLocaleString()}.`); return; }
     try {
       await create.mutateAsync({ title: title.trim(), description: description.trim(), slug, canonicalUrl, allowedCountryCodes: countries, contactLimit: parsedLimit });
     } catch { /* mutation feedback is shown by tRPC */ }
@@ -82,7 +85,8 @@ export function CreateCollectionDialog({ onCreated, remainingCollections, onPlan
               </div>
               <div className="field-block">
                 <label className="field-label" htmlFor="contact-limit">Contact limit</label>
-                <Input id="contact-limit" type="number" min={1} max={100000} value={limit} onChange={event => setLimit(event.target.value)} required />
+                <Input id="contact-limit" type="number" min={1} max={maxContactLimit} value={limit} onChange={event => setLimit(event.target.value)} required />
+                {maxContactLimit < 100000 && <p className="field-hint">This account can set up to {maxContactLimit.toLocaleString()} contacts per link.</p>}
               </div>
             </div>
             <div className="field-block">

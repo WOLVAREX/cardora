@@ -114,6 +114,9 @@ export const cardoraRouter = router({
           if (!owner) throw new TRPCError({ code: "NOT_FOUND", message: "Owner account not found." });
           const entitlement = await getOwnerEntitlement(tx, ctx.user.id);
           if (!entitlement.usage.canCreateCollection) return null;
+          if (input.contactLimit > entitlement.maxContactsPerCollection) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: `This account can set new collection links to at most ${entitlement.maxContactsPerCollection.toLocaleString()} contacts each. Contact Cardora support if you need a higher limit.` });
+          }
           const [inserted] = await tx.insert(collections).values({
             ownerId: ctx.user.id,
             title: input.title,

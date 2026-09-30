@@ -107,6 +107,18 @@ export const ownerSubscriptions = pgTable("cardora_owner_subscriptions", {
 }));
 export type OwnerSubscription = typeof ownerSubscriptions.$inferSelect;
 
+/** Optional per-owner limits set by Cardora support, on top of the assigned plan. */
+export const ownerQuotaOverrides = pgTable("cardora_owner_quota_overrides", {
+  id: serial("id").primaryKey(),
+  ownerId: integer("ownerId").notNull(),
+  contactLimit: integer("contactLimit"),
+  collectionLimit: integer("collectionLimit"),
+  maxContactsPerCollection: integer("maxContactsPerCollection"),
+  updatedBy: integer("updatedBy"),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, table => ({ ownerUnique: uniqueIndex("cardora_owner_quota_overrides_owner_unique").on(table.ownerId) }));
+export type OwnerQuotaOverride = typeof ownerQuotaOverrides.$inferSelect;
+
 /** One-time Paystack checkouts; card details and reusable authorizations are never stored. */
 export const subscriptionPayments = pgTable("cardora_subscription_payments", {
   id: serial("id").primaryKey(),
