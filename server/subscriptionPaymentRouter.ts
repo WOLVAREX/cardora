@@ -84,6 +84,16 @@ export const subscriptionPaymentRouter = router({
     if (payment.status === "paid") return { status: "paid" as const, message: "Your plan is active." };
     if (payment.status === "failed") return { status: "failed" as const, message: "This payment was not completed. Start a new checkout to try again." };
 
+    if (payment.providerChannel === "mobile_money") {
+      const sinceLastCheck = Date.now() - payment.updatedAt.getTime();
+      if (sinceLastCheck < 10_000) {
+        return { status: "pending" as const, message: "M-Pesa can take a moment to respond. Wait a few seconds before checking again." };
+      }
+      await db.update(subscriptionPayments).set({ updatedAt: new Date() }).where(and(
+        eq(subscriptionPayments.id, payment.id), eq(subscriptionPayments.status, "pending"),
+      ));
+    }
+
     const config = getPaystackConfig();
     if (!config) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Payment verification is not configured on this server yet." });
     const paystack = createPaystackClient(config);
