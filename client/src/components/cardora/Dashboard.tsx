@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BadgeCheck, Bell, BookOpen, Check, ChevronRight, ClipboardList, Copy, CreditCard, Download, ExternalLink, FileDown, Globe2, LayoutDashboard, Link2, LogOut, Mail, Menu, MoreHorizontal, Plus, Settings, ShieldCheck, Smartphone, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Brand, BrandMark } from "./Brand";
 import { CreateCollectionDialog } from "./CreateCollectionDialog";
 import { ContactsView } from "./ContactsView";
@@ -164,6 +165,7 @@ function CollectionRows({ collections, onManage }: { collections: CollectionList
   const utils = trpc.useUtils();
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [exporting, setExporting] = useState<number | null>(null);
+  const [pendingDownload, setPendingDownload] = useState<(typeof collections)[number] | null>(null);
   async function copyLink(collection: (typeof collections)[number]) {
     try { await navigator.clipboard.writeText(safeShareUrl(collection.canonicalUrl, collection.slug)); setCopiedId(collection.id); toast.success("Collection link copied."); setTimeout(() => setCopiedId(null), 1800); }
     catch { toast.error("Couldn’t copy the link. Try copying it from the preview."); }
@@ -179,13 +181,18 @@ function CollectionRows({ collections, onManage }: { collections: CollectionList
     } catch { toast.error("Couldn’t export this collection."); }
     finally { setExporting(null); }
   }
-  return <div className="collection-list">{collections.map(collection => {
+  function requestDownload(collection: (typeof collections)[number]) {
+    const full = collection.status !== "open" || collection.usedSlots >= collection.contactLimit;
+    if (!full) { setPendingDownload(collection); return; }
+    void exportCollection(collection);
+  }
+  return <><div className="collection-list">{collections.map(collection => {
     const percent = Math.min(100, Math.round((collection.usedSlots / collection.contactLimit) * 100));
     const full = collection.status !== "open" || collection.usedSlots >= collection.contactLimit;
     return <article className="collection-row" key={collection.id}>
       <div className="collection-icon"><BrandMark size="sm" /></div>
       <div className="collection-main"><div className="collection-name-line"><h3>{collection.title}</h3><span className={`status-pill ${full ? "full" : "open"}`}><span />{full ? "At capacity" : "Accepting"}</span></div><p>{collection.description || "No description"}</p><div className="collection-progress"><div className="progress-track"><span style={{ width: `${percent}%` }} /></div><span>{collection.usedSlots} of {collection.contactLimit}</span><span className="progress-dot">·</span><span>{collection.activeContactCount} saved</span></div></div>
-      <div className="collection-actions"><button className="action-icon" title="Copy link" aria-label={`Copy ${collection.title} link`} onClick={() => copyLink(collection)}>{copiedId === collection.id ? <Check size={16} /> : <Copy size={16} />}</button><button className="action-icon" title="Download VCF" aria-label={`Download ${collection.title} VCF`} onClick={() => exportCollection(collection)} disabled={exporting === collection.id}><Download size={16} /></button><button className="row-manage" onClick={() => onManage(collection.id)}>Manage <ChevronRight size={14} /></button></div>
+      <div className="collection-actions"><button className="action-icon" title="Copy link" aria-label={`Copy ${collection.title} link`} onClick={() => copyLink(collection)}>{copiedId === collection.id ? <Check size={16} /> : <Copy size={16} />}</button><button className="action-icon" title="Download VCF" aria-label={`Download ${collection.title} VCF`} onClick={() => requestDownload(collection)} disabled={exporting === collection.id}><Download size={16} /></button><button className="row-manage" onClick={() => onManage(collection.id)}>Manage <ChevronRight size={14} /></button></div>
     </article>;
-  })}</div>;
+  })}</div><AlertDialog open={Boolean(pendingDownload)} onOpenChange={open => { if (!open) setPendingDownload(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Download before this collection is full?</AlertDialogTitle><AlertDialogDescription>{pendingDownload?.usedSlots ?? 0} of {pendingDownload?.contactLimit ?? 0} spots are filled in “{pendingDownload?.title}”. This VCF will include contacts accepted so far; contacts added later will not be included in this file.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep collecting</AlertDialogCancel><AlertDialogAction onClick={() => { if (pendingDownload) void exportCollection(pendingDownload); setPendingDownload(null); }}>Download current VCF</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></>;
 }

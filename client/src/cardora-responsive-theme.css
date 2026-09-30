@@ -794,12 +794,17 @@
 .dark .subscription-current-title h2,.dark .subscription-usage-heading>div>strong,.dark .subscription-current-meta strong,.dark .subscription-option-head h3,.dark .subscription-option-price { color:#e2ebdf; }
 .dark .subscription-current-title p,.dark .subscription-current-meta,.dark .subscription-usage-heading>div>span,.dark .subscription-usage-card>p,.dark .subscription-option>p { color:#a4b0a2; }
 .dark .subscription-current-meta,.dark .subscription-option { border-color:#344239; }
+.dark .subscription-option { background:#202d24!important; color:#e2ebdf; }
+.dark .subscription-option.current { border-color:#718b68; box-shadow:0 0 0 2px rgba(160,190,130,.13); }
+.dark .subscription-option-head>span,.dark .subscription-option-price small { color:#a9ba9f; }
+.dark .subscription-option-limits span { background:#2a3a2e; color:#d0ddc8; }
 .dark .subscription-plan-icon,.dark .subscription-usage-icon,.dark .subscription-option-limits span,.dark .subscription-managed-badge { background:#26372b; color:#cadbbf; }
 .dark .subscription-status { background:#26372b; border-color:#3b4b3c; color:#c7d8ba; }
 .dark .subscription-status.past_due,.dark .subscription-status.expired,.dark .subscription-status.canceled { background:#3b3024; border-color:#4e4030; color:#e2b891; }
 .dark .subscription-progress { background:#2b392f; }
 .dark .subscription-checkout-note,.dark .subscription-error { background:#202e24; border-color:#39483d; color:#b7c4b4; }
 .dark .subscription-checkout-note strong { color:#dbe6d6; }
+.dark .subscription-checkout-note svg { color:#b5cc9a; }
 .dark .admin-subscription-intro,.dark .admin-plan-card,.dark .admin-plan-facts span { background:#1b2820; border-color:#35443a; }
 .dark .admin-subscription-intro strong,.dark .admin-plan-card-head h3,.dark .admin-plan-facts strong { color:#dce8d8; }
 .dark .admin-subscription-intro p,.dark .admin-plan-card>p,.dark .admin-plan-card-footer,.dark .admin-plan-hint { color:#a4b0a2; }

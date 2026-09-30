@@ -17,6 +17,7 @@ export function SubscriptionView() {
   if (query.error || !query.data) return <div className="subscription-page"><div className="subscription-error" role="alert">Your plan details could not be loaded. Try again in a moment.<button type="button" className="text-button" onClick={() => void query.refetch()} disabled={query.isFetching}>{query.isFetching ? "Retrying…" : "Try again"}</button></div></div>;
 
   const { plan, subscription, usage, availablePlans } = query.data;
+  const hasPaidPlans = availablePlans.some(item => item.priceMinor > 0);
   const contactPercent = Math.min(100, Math.round((usage.acceptedContacts / plan.contactLimit) * 100));
   const collectionPercent = Math.min(100, Math.round((usage.collections / plan.collectionLimit) * 100));
   const currentLabel = subscription.status === "free" ? "Free plan" : subscription.status.replaceAll("_", " ");
@@ -42,7 +43,7 @@ export function SubscriptionView() {
         <p>{item.description}</p>
         <div className="subscription-option-limits"><span>{new Intl.NumberFormat().format(item.contactLimit)} contacts</span><span>{new Intl.NumberFormat().format(item.collectionLimit)} links</span></div>
       </article>)}</div>
-      <div className="subscription-checkout-note"><ShieldCheck size={16} /><p><strong>Billing checkout is not active yet.</strong> Cardora's Paystack checkout and automatic renewals will be enabled for production after the merchant account and server webhook configuration are ready. For now, an administrator manages plan changes; no payment is taken here.</p></div>
+      <div className="subscription-checkout-note"><ShieldCheck size={16} /><p>{hasPaidPlans ? <><strong>Plan changes are managed by Cardora.</strong> Contact support if you need to change your plan or limits. No payment is taken on this page.</> : <><strong>Paid plans are currently unavailable.</strong> Your {plan.name} plan remains active. Contact support if you need a plan change or more capacity; no payment is taken on this page.</>}</p></div>
     </section>
   </div>;
 }
