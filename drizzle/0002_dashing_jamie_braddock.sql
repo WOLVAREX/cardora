@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `notificationEmail` varchar(320);

@@ -1,0 +1,9 @@
+{
+  "routes": [
+    { "path": "/", "title": "Cardora dashboard" },
+    { "path": "/login", "title": "Cardora email sign-in and account creation" },
+    { "path": "/c/:slug", "title": "Public VCF collection" },
+    { "path": "/admin", "title": "Cardora administration" },
+    { "path": "/privacy", "title": "Cardora privacy" }
+  ]
+}

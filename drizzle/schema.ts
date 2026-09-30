@@ -1,0 +1,222 @@
+import { boolean, index, int, json, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+
+/**
+ * Core user table backing auth flow.
+ * Extend this file with additional tables as your product grows.
+ * Columns use camelCase to match both database fields and generated types.
+ */
+export const users = mysqlTable("users", {
+  /**
+   * Surrogate primary key. Auto-incremented numeric value managed by the database.
+   * Use this for relations between tables.
+   */
+  id: int("id").autoincrement().primaryKey(),
+  /** Preserved only for legacy accounts previously linked through Manus OAuth. */
+  openId: varchar("openId", { length: 64 }).unique(),
+  name: text("name"),
+  email: varchar("email", { length: 320 }),
+  /** Normalized email reserved for Cardora password authentication. */
+  emailAuthEmail: varchar("emailAuthEmail", { length: 320 }),
+  /** Scrypt hash; never returned by an API or stored in a browser. */
+  passwordHash: varchar("passwordHash", { length: 255 }),
+  notificationEmail: varchar("notificationEmail", { length: 320 }),
+  loginMethod: varchar("loginMethod", { length: 64 }),
+  phoneE164: varchar("phoneE164", { length: 24 }),
+  phoneCountryCode: varchar("phoneCountryCode", { length: 2 }),
+  phoneVerifiedAt: timestamp("phoneVerifiedAt"),
+  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+}, table => ({
+  emailAuthEmailUnique: uniqueIndex("users_email_auth_email_unique").on(table.emailAuthEmail),
+}));
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
+export type PublicUser = Pick<User, "id" | "name" | "email" | "role">;
+
+/** Opaque session tokens are stored only as digests and can be revoked server-side. */
+export const sessions = mysqlTable("cardora_sessions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => ({
+  tokenHashUnique: uniqueIndex("cardora_sessions_token_hash_unique").on(table.tokenHash),
+  userIndex: index("cardora_sessions_user_idx").on(table.userId),
+  expiryIndex: index("cardora_sessions_expiry_idx").on(table.expiresAt),
+}));
+
+/** Admin-editable plans define account-wide quotas as well as paid price metadata. */
+export const subscriptionPlans = mysqlTable("cardora_subscription_plans", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 40 }).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description").notNull(),
+  contactLimit: int("contactLimit").notNull(),
+  collectionLimit: int("collectionLimit").notNull(),
+  priceMinor: int("priceMinor").default(0).notNull(),
+  currency: varchar("currency", { length: 3 }).default("KES").notNull(),
+  billingInterval: mysqlEnum("billingInterval", ["monthly", "yearly"]).default("monthly").notNull(),
+  paystackPlanCode: varchar("paystackPlanCode", { length: 80 }),
+  isActive: boolean("isActive").default(true).notNull(),
+  isDefault: boolean("isDefault").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({
+  codeUnique: uniqueIndex("cardora_subscription_plans_code_unique").on(table.code),
+  activeIndex: index("cardora_subscription_plans_active_idx").on(table.isActive),
+  defaultIndex: index("cardora_subscription_plans_default_idx").on(table.isDefault),
+}));
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+export type InsertSubscriptionPlan = typeof subscriptionPlans.$inferInsert;
+
+/** One current assignment per owner. A missing/expired assignment resolves to the default plan. */
+export const ownerSubscriptions = mysqlTable("cardora_owner_subscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull(),
+  planId: int("planId").notNull(),
+  status: mysqlEnum("status", ["active", "past_due", "canceled", "expired"]).default("active").notNull(),
+  source: mysqlEnum("source", ["admin", "paystack"]).default("admin").notNull(),
+  paystackCustomerCode: varchar("paystackCustomerCode", { length: 80 }),
+  paystackSubscriptionCode: varchar("paystackSubscriptionCode", { length: 80 }),
+  currentPeriodStart: timestamp("currentPeriodStart"),
+  currentPeriodEnd: timestamp("currentPeriodEnd"),
+  cancelAtPeriodEnd: boolean("cancelAtPeriodEnd").default(false).notNull(),
+  assignedBy: int("assignedBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({
+  ownerUnique: uniqueIndex("cardora_owner_subscriptions_owner_unique").on(table.ownerId),
+  planIndex: index("cardora_owner_subscriptions_plan_idx").on(table.planId),
+  providerSubscriptionIndex: index("cardora_owner_subscriptions_paystack_idx").on(table.paystackSubscriptionCode),
+}));
+export type OwnerSubscription = typeof ownerSubscriptions.$inferSelect;
+
+/** One-time Paystack checkouts; card details and reusable authorizations are never stored. */
+export const subscriptionPayments = mysqlTable("cardora_subscription_payments", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull(),
+  planId: int("planId").notNull(),
+  reference: varchar("reference", { length: 48 }).notNull(),
+  amountMinor: int("amountMinor").notNull(),
+  currency: varchar("currency", { length: 3 }).notNull(),
+  billingInterval: mysqlEnum("billingInterval", ["monthly", "yearly"]).notNull(),
+  status: mysqlEnum("status", ["initializing", "pending", "paid", "failed"]).default("initializing").notNull(),
+  authorizationUrl: varchar("authorizationUrl", { length: 2048 }),
+  accessCode: varchar("accessCode", { length: 160 }),
+  providerChannel: varchar("providerChannel", { length: 40 }),
+  paidAt: timestamp("paidAt"),
+  periodStartAt: timestamp("periodStartAt"),
+  periodEndAt: timestamp("periodEndAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({
+  referenceUnique: uniqueIndex("cardora_subscription_payments_reference_unique").on(table.reference),
+  ownerCreatedIndex: index("cardora_subscription_payments_owner_created_idx").on(table.ownerId, table.createdAt),
+  ownerStatusIndex: index("cardora_subscription_payments_owner_status_idx").on(table.ownerId, table.status),
+  statusCreatedIndex: index("cardora_subscription_payments_status_created_idx").on(table.status, table.createdAt),
+}));
+export type SubscriptionPayment = typeof subscriptionPayments.$inferSelect;
+
+export const collections = mysqlTable("cardora_collections", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull(),
+  slug: varchar("slug", { length: 80 }).notNull(),
+  title: varchar("title", { length: 120 }).notNull(),
+  description: text("description").notNull(),
+  canonicalUrl: varchar("canonicalUrl", { length: 2048 }).notNull(),
+  allowedCountryCodes: json("allowedCountryCodes").$type<string[]>().notNull(),
+  contactLimit: int("contactLimit").notNull(),
+  usedSlots: int("usedSlots").default(0).notNull(),
+  status: mysqlEnum("status", ["open", "full", "paused"]).default("open").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({
+  slugUnique: uniqueIndex("cardora_collections_slug_unique").on(table.slug),
+  ownerIndex: index("cardora_collections_owner_idx").on(table.ownerId),
+}));
+export type Collection = typeof collections.$inferSelect;
+
+export const contacts = mysqlTable("cardora_contacts", {
+  id: int("id").autoincrement().primaryKey(),
+  collectionId: int("collectionId").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  phoneE164: varchar("phoneE164", { length: 24 }).notNull(),
+  countryCode: varchar("countryCode", { length: 2 }).notNull(),
+  email: varchar("email", { length: 320 }),
+  emailOptIn: boolean("emailOptIn").default(false).notNull(),
+  smsOptIn: boolean("smsOptIn").default(false).notNull(),
+  consentVersion: varchar("consentVersion", { length: 24 }).notNull(),
+  consentedAt: timestamp("consentedAt").defaultNow().notNull(),
+  unsubscribeToken: varchar("unsubscribeToken", { length: 64 }).notNull().unique(),
+  status: mysqlEnum("status", ["accepted", "removed"]).default("accepted").notNull(),
+  unsubscribedAt: timestamp("unsubscribedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => ({
+  phoneUnique: uniqueIndex("cardora_contacts_collection_phone_unique").on(table.collectionId, table.phoneE164),
+  collectionIndex: index("cardora_contacts_collection_idx").on(table.collectionId),
+}));
+export type Contact = typeof contacts.$inferSelect;
+
+export const ownerAlerts = mysqlTable("cardora_owner_alerts", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull(),
+  collectionId: int("collectionId").notNull(),
+  kind: mysqlEnum("kind", ["capacity_reached", "account_limit_reached"]).default("capacity_reached").notNull(),
+  message: varchar("message", { length: 240 }).notNull(),
+  readAt: timestamp("readAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => ({ ownerIndex: index("cardora_alerts_owner_idx").on(table.ownerId, table.createdAt) }));
+
+export const campaigns = mysqlTable("cardora_campaigns", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull(),
+  collectionId: int("collectionId").notNull(),
+  channel: mysqlEnum("channel", ["email", "sms"]).notNull(),
+  subject: varchar("subject", { length: 160 }).notNull(),
+  message: text("message").notNull(),
+  eligibleRecipientCount: int("eligibleRecipientCount").default(0).notNull(),
+  recipientSnapshotHash: varchar("recipientSnapshotHash", { length: 64 }),
+  status: mysqlEnum("status", ["not_sent", "sending", "queued", "partial", "failed"]).default("not_sent").notNull(),
+  queuedRecipientCount: int("queuedRecipientCount").default(0).notNull(),
+  skippedRecipientCount: int("skippedRecipientCount").default(0).notNull(),
+  providerMessageIds: text("providerMessageIds"),
+  failureReason: varchar("failureReason", { length: 240 }),
+  sentAt: timestamp("sentAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => ({ ownerIndex: index("cardora_campaigns_owner_idx").on(table.ownerId, table.createdAt) }));
+
+export const phoneVerifications = mysqlTable("cardora_phone_verifications", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull(),
+  phoneE164: varchar("phoneE164", { length: 24 }).notNull(),
+  codeDigest: varchar("codeDigest", { length: 64 }).notNull(),
+  attempts: int("attempts").default(0).notNull(),
+  sentAt: timestamp("sentAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  verifiedAt: timestamp("verifiedAt"),
+}, table => ({ ownerIndex: index("cardora_phone_verifications_owner_idx").on(table.ownerId, table.sentAt) }));
+
+export const gmailConnections = mysqlTable("cardora_gmail_connections", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull(),
+  gmailAddress: varchar("gmailAddress", { length: 320 }).notNull(),
+  encryptedRefreshToken: text("encryptedRefreshToken").notNull(),
+  tokenIv: varchar("tokenIv", { length: 32 }).notNull(),
+  tokenTag: varchar("tokenTag", { length: 32 }).notNull(),
+  grantedScopes: text("grantedScopes"),
+  connectedAt: timestamp("connectedAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({ ownerUnique: uniqueIndex("cardora_gmail_connections_owner_unique").on(table.ownerId) }));
+
+export const gmailOauthStates = mysqlTable("cardora_gmail_oauth_states", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull(),
+  stateDigest: varchar("stateDigest", { length: 64 }).notNull().unique(),
+  codeVerifier: varchar("codeVerifier", { length: 128 }).notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => ({ ownerIndex: index("cardora_gmail_oauth_owner_idx").on(table.ownerId, table.createdAt) }));

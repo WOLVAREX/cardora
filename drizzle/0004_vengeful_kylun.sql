@@ -1,0 +1,1 @@
+ALTER TABLE `cardora_campaigns` ADD `recipientSnapshotHash` varchar(64);

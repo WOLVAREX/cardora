@@ -1,0 +1,1 @@
+ALTER TABLE `cardora_owner_alerts` MODIFY COLUMN `kind` enum('capacity_reached','account_limit_reached') NOT NULL DEFAULT 'capacity_reached';
