@@ -1,15 +1,15 @@
 import { boolean, index, integer, jsonb, pgEnum, pgTable, serial, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 
-const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
-const billingIntervalEnum = pgEnum("billing_interval", ["monthly", "yearly"]);
-const ownerSubscriptionStatusEnum = pgEnum("owner_subscription_status", ["active", "past_due", "canceled", "expired"]);
-const subscriptionSourceEnum = pgEnum("subscription_source", ["admin", "paystack"]);
-const paymentStatusEnum = pgEnum("payment_status", ["initializing", "pending", "paid", "failed"]);
-const collectionStatusEnum = pgEnum("collection_status", ["open", "full", "paused"]);
-const contactStatusEnum = pgEnum("contact_status", ["accepted", "removed"]);
-const alertKindEnum = pgEnum("owner_alert_kind", ["capacity_reached", "account_limit_reached"]);
-const campaignChannelEnum = pgEnum("campaign_channel", ["email", "sms"]);
-const campaignStatusEnum = pgEnum("campaign_status", ["not_sent", "sending", "queued", "partial", "failed"]);
+export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
+export const billingIntervalEnum = pgEnum("billing_interval", ["monthly", "yearly"]);
+export const ownerSubscriptionStatusEnum = pgEnum("owner_subscription_status", ["active", "past_due", "canceled", "expired"]);
+export const subscriptionSourceEnum = pgEnum("subscription_source", ["admin", "paystack"]);
+export const paymentStatusEnum = pgEnum("payment_status", ["initializing", "pending", "paid", "failed"]);
+export const collectionStatusEnum = pgEnum("collection_status", ["open", "full", "paused"]);
+export const contactStatusEnum = pgEnum("contact_status", ["accepted", "removed"]);
+export const alertKindEnum = pgEnum("owner_alert_kind", ["capacity_reached", "account_limit_reached"]);
+export const campaignChannelEnum = pgEnum("campaign_channel", ["email", "sms"]);
+export const campaignStatusEnum = pgEnum("campaign_status", ["not_sent", "sending", "queued", "partial", "failed"]);
 
 /**
  * Core user table backing auth flow.

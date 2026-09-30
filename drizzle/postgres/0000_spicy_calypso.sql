@@ -1,3 +1,13 @@
+CREATE TYPE "public"."owner_alert_kind" AS ENUM('capacity_reached', 'account_limit_reached');--> statement-breakpoint
+CREATE TYPE "public"."billing_interval" AS ENUM('monthly', 'yearly');--> statement-breakpoint
+CREATE TYPE "public"."campaign_channel" AS ENUM('email', 'sms');--> statement-breakpoint
+CREATE TYPE "public"."campaign_status" AS ENUM('not_sent', 'sending', 'queued', 'partial', 'failed');--> statement-breakpoint
+CREATE TYPE "public"."collection_status" AS ENUM('open', 'full', 'paused');--> statement-breakpoint
+CREATE TYPE "public"."contact_status" AS ENUM('accepted', 'removed');--> statement-breakpoint
+CREATE TYPE "public"."owner_subscription_status" AS ENUM('active', 'past_due', 'canceled', 'expired');--> statement-breakpoint
+CREATE TYPE "public"."payment_status" AS ENUM('initializing', 'pending', 'paid', 'failed');--> statement-breakpoint
+CREATE TYPE "public"."subscription_source" AS ENUM('admin', 'paystack');--> statement-breakpoint
+CREATE TYPE "public"."user_role" AS ENUM('user', 'admin');--> statement-breakpoint
 CREATE TABLE "cardora_campaigns" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"ownerId" integer NOT NULL,
